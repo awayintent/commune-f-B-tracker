@@ -2,6 +2,7 @@ import { Header } from '@/app/components/Header';
 import { Footer } from '@/app/components/Footer';
 import { HeadlineCounter } from '@/app/components/HeadlineCounter';
 import { RecentClosures } from '@/app/components/RecentClosures';
+import { BurntEndStories } from '@/app/components/BurntEndStories';
 import { MainTable } from '@/app/components/MainTable';
 import { SubmissionCTA } from '@/app/components/SubmissionCTA';
 import { EventsAndArticles } from '@/app/components/EventsAndArticles';
@@ -32,6 +33,11 @@ export default function App() {
               {/* Recent Closures */}
               <div className="px-4 md:px-0">
                 <RecentClosures />
+              </div>
+
+              {/* Burnt End Stories - Full width section */}
+              <div className="-mx-4 md:-mx-[calc((100vw-1280px)/2+2rem)] lg:-mx-[calc((100vw-1280px)/2+2rem+8.33%+1rem)]">
+                <BurntEndStories />
               </div>
 
               {/* Main Table */}

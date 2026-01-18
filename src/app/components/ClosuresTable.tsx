@@ -230,7 +230,6 @@ export function ClosuresTable() {
               </TableBody>
             </Table>
           </div>
-        </div>
     </div>
   );
 }
