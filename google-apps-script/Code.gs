@@ -57,8 +57,7 @@ const CLOSURES_COLUMNS = {
   last_day: 7,
   description: 8,
   source_urls: 9,
-  evidence_excerpt: 10,
-  tags: 11
+  tags: 10
 };
 
 // Review columns (added to the right of form columns in Submissions sheet)
@@ -360,7 +359,6 @@ function acceptSubmission(row) {
     data[FORM_COLUMNS['Last Day of Operation']],    // last_day
     data[FORM_COLUMNS['Reason for Closure']],       // description
     data[FORM_COLUMNS['Source URL']],               // source_urls
-    '',                                               // evidence_excerpt - can be added manually
     ''                                                // tags - to be filled manually
   ];
   

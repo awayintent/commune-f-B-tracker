@@ -1,5 +1,62 @@
 # Schema Changes Log
 
+## Change #5: Removed `evidence_excerpt` Column
+
+**Date:** January 18, 2026  
+**Reason:** The `evidence_excerpt` field was rarely used and added unnecessary complexity. Source URLs are sufficient for verification.
+
+### What Changed
+
+#### Closures Sheet (Public)
+**Before (12 columns):**
+```
+closure_id | added_at | business_name | outlet_name | address | category | status | last_day | description | source_urls | evidence_excerpt | tags
+```
+
+**After (11 columns):**
+```
+closure_id | added_at | business_name | outlet_name | address | category | status | last_day | description | source_urls | tags
+```
+
+**Changes:**
+- ❌ Removed: `evidence_excerpt` (was column 10)
+- ✅ Note: Source URLs remain for verification purposes
+
+### Files Updated
+
+1. **google-apps-script/Code.gs**
+   - Updated `CLOSURES_COLUMNS` mapping (tags moved from 11 → 10)
+   - Updated `acceptSubmission()` to not include evidence_excerpt
+
+2. **src/app/data/types.ts**
+   - Removed `evidence_excerpt: string` from Closure interface
+
+3. **src/app/data/closures.ts**
+   - Updated CSV parsing to expect 11 columns instead of 12
+   - Removed evidence_excerpt field mapping
+
+### Migration Guide
+
+If you already have data in your sheets:
+
+**For Closures sheet:**
+1. Delete the `evidence_excerpt` column (column K)
+2. Verify you now have 11 columns
+3. No data loss - source URLs are preserved
+
+**Google Apps Script:**
+- Copy the updated `Code.gs` from `google-apps-script/Code.gs`
+- Replace your existing script completely
+
+### Benefits
+
+✅ **Simpler schema** - One less column to manage  
+✅ **Less redundancy** - Source URLs are sufficient for verification  
+✅ **Easier maintenance** - Fewer fields to populate  
+✅ **Cleaner data** - Focus on essential information
+
+---
+
 ## Change #4: Simplified Submissions Schema
 
 **Date:** January 18, 2026  
@@ -224,20 +281,23 @@ Potential future changes to consider:
 ## Summary of All Changes
 
 **Current Schema:**
-- **Closures:** 12 columns (was 15)
-- **Submissions:** 22 columns (was 25)
+- **Closures:** 11 columns (was 15)
+- **Submissions:** 15 columns (10 form + 5 review, was 25)
 
 **Removed Columns:**
 1. `reasons` / `short_note` → Consolidated into `description`
 2. `area` / `area_raw` → Include in `address` field
 3. `announced_date` → Use `last_day` instead
+4. `evidence_excerpt` → Source URLs are sufficient
+5. Multiple submission tracking columns → Simplified to Google Forms defaults
 
 **Benefits:**
-- 20% fewer columns overall
+- 27% fewer columns overall (11 vs 15 for Closures)
 - Simpler, more intuitive schema
 - Easier for users to submit
 - Less redundant data
 - More realistic for actual closure scenarios
+- Direct integration with Google Forms
 
 ---
 

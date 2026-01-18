@@ -11,7 +11,6 @@ export interface Closure {
   last_day: string;
   description: string;
   source_urls: string;
-  evidence_excerpt: string;
   tags: string;
 }
 

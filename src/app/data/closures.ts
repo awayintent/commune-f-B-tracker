@@ -46,7 +46,7 @@ function parseCSV(csvText: string): Closure[] {
     // Simple CSV parser - handles quoted fields
     const fields = parseCSVLine(line);
     
-    if (fields.length < 12) {
+    if (fields.length < 11) {
       continue; // Skip incomplete rows
     }
 
@@ -61,8 +61,7 @@ function parseCSV(csvText: string): Closure[] {
       last_day: fields[7] || '',
       description: fields[8] || '',
       source_urls: fields[9] || '',
-      evidence_excerpt: fields[10] || '',
-      tags: fields[11] || '',
+      tags: fields[10] || '',
     });
   }
 
