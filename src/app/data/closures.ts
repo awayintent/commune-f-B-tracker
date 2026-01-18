@@ -7,6 +7,8 @@ import { Closure, MonthlyCounts } from './types';
 export async function fetchClosures(): Promise<Closure[]> {
   const csvUrl = import.meta.env.VITE_CLOSURES_CSV_URL;
   
+  console.log('CSV URL:', csvUrl);
+  
   if (!csvUrl) {
     console.warn('VITE_CLOSURES_CSV_URL not configured, returning empty array');
     return [];
@@ -19,6 +21,9 @@ export async function fetchClosures(): Promise<Closure[]> {
     }
     
     const csvText = await response.text();
+    console.log('CSV Text (first 500 chars):', csvText.substring(0, 500));
+    console.log('Total CSV length:', csvText.length);
+    
     const closures = parseCSV(csvText);
     return closures;
   } catch (error) {
@@ -46,10 +51,19 @@ function parseCSV(csvText: string): Closure[] {
     // Simple CSV parser - handles quoted fields
     const fields = parseCSVLine(line);
     
+    // Debug logging
+    console.log(`Row: ${fields[2]}, Fields: ${fields.length}, Published field: "${fields[10]}"`);
+    
     // Need at least business name to be valid
     if (fields.length < 3 || !fields[2]) {
+      console.log(`Skipping row - insufficient fields or no business name`);
       continue; // Skip incomplete rows
     }
+
+    const publishedValue = fields[10]?.trim();
+    const isPublished = publishedValue === 'TRUE' || publishedValue === 'true';
+    
+    console.log(`Business: ${fields[2]}, Published value: "${publishedValue}", Is published: ${isPublished}`);
 
     const closure = {
       closure_id: fields[0] || '',
@@ -62,15 +76,19 @@ function parseCSV(csvText: string): Closure[] {
       description: fields[7] || '',
       source_urls: fields[8] || '',
       tags: fields[9] || '',
-      // Check if published column exists and is TRUE, otherwise default to true for backward compatibility
-      published: fields.length > 10 ? (fields[10] === 'TRUE' || fields[10] === 'true') : true,
+      published: isPublished,
     };
 
     // Only include published closures
     if (closure.published) {
+      console.log(`✅ Including: ${closure.business_name}`);
       closures.push(closure);
+    } else {
+      console.log(`❌ Excluding: ${closure.business_name} (published=${publishedValue})`);
     }
   }
+  
+  console.log(`Total closures parsed: ${closures.length}`);
 
   return closures;
 }
