@@ -785,8 +785,12 @@ function processScrapeSites(sheet, existingUrls, nextCandidateId) {
           const matchedTerms = findMatchedKeywords(headline);
           
           if (matchedTerms.length > 0) {
+            Logger.log(`✓ Keywords matched in: "${headline}"`);
+            
             // Use AI to analyze if this is actually a closure
             const analysis = analyzeHeadlineWithAI(headline, url, site.name);
+            
+            Logger.log(`AI result - isClosure: ${analysis.isClosure}, confidence: ${analysis.confidence}, reason: ${analysis.reason}`);
             
             // Only add if AI confirms it's likely a closure (confidence >= 0.6)
             if (analysis.isClosure && analysis.confidence >= 0.6) {
@@ -794,6 +798,10 @@ function processScrapeSites(sheet, existingUrls, nextCandidateId) {
               
               // Check for duplicates by business name
               const isDuplicate = checkDuplicateCandidate(sheet, analysis.businessName);
+              
+              if (isDuplicate) {
+                Logger.log(`⚠️ Duplicate detected: ${analysis.businessName}`);
+              }
               
               // Add to candidates sheet
               const candidateId = `CAND-${String(nextCandidateId).padStart(5, '0')}`;
@@ -818,11 +826,15 @@ function processScrapeSites(sheet, existingUrls, nextCandidateId) {
               nextCandidateId++;
               existingUrls.add(url);
               
+              Logger.log(`✅ Added candidate: ${analysis.businessName} (${analysis.confidence})`);
+              
               // Small delay to avoid rate limiting
               Utilities.sleep(500);
             } else {
-              Logger.log(`Rejected: "${headline}" - ${analysis.reason}`);
+              Logger.log(`❌ Rejected: "${headline}" - ${analysis.reason}`);
             }
+          } else {
+            Logger.log(`No keywords matched in: "${headline}"`);
           }
         } catch (articleError) {
           Logger.log(`Error processing article: ${articleError}`);
@@ -910,65 +922,84 @@ function searchSiteForClosures(site) {
 function extractArticlesFromSearchPage(html, site) {
   const articles = [];
   
-  // Pattern 1: Look for article links with href and title/text
-  const linkPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi;
+  // For Straits Times - based on the screenshot, articles are in specific structure
+  if (site.name === 'The Straits Times') {
+    // ST Pattern: Look for article titles and dates
+    // The structure shows: headline, date, and link
+    const stPattern = /<h[2-4][^>]*>([^<]+)<\/h[2-4]>[\s\S]{0,200}?<a[^>]*href=["']([^"']+)["']/gi;
+    let match;
+    
+    while ((match = stPattern.exec(html)) !== null) {
+      let title = match[1].trim();
+      let url = match[2];
+      
+      if (url.startsWith('/')) {
+        url = site.baseUrl + url;
+      }
+      
+      if (title.length > 15 && url.includes('/life/') || url.includes('/food/') || url.includes('/singapore/')) {
+        articles.push({ title, url });
+      }
+    }
+    
+    // Alternative ST pattern: link contains the title
+    const stPattern2 = /<a[^>]*href=["'](\/[^"']+)["'][^>]*>[\s\S]{0,50}?([^<]{20,}?)<\/a>/gi;
+    while ((match = stPattern2.exec(html)) !== null) {
+      let url = site.baseUrl + match[1];
+      let title = match[2].trim().replace(/<[^>]+>/g, '');
+      
+      if (title.length > 15 && !articles.find(a => a.url === url)) {
+        articles.push({ title, url });
+      }
+    }
+  }
+  
+  // For CNA - different structure
+  if (site.name === 'CNA') {
+    // CNA uses different HTML structure
+    const cnaPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>[\s\S]{0,100}?<h[2-4][^>]*>([^<]+)<\/h[2-4]>/gi;
+    let match;
+    
+    while ((match = cnaPattern.exec(html)) !== null) {
+      let url = match[1];
+      let title = match[2].trim();
+      
+      if (url.startsWith('/')) {
+        url = site.baseUrl + url;
+      }
+      
+      if (title.length > 15 && !articles.find(a => a.url === url)) {
+        articles.push({ title, url });
+      }
+    }
+  }
+  
+  // Generic fallback pattern - any link with substantial text
+  const genericPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]{20,}?)<\/a>/gi;
   let match;
   
-  while ((match = linkPattern.exec(html)) !== null) {
+  while ((match = genericPattern.exec(html)) !== null) {
     let url = match[1];
     let title = match[2].trim();
-    
-    // Clean up title - remove HTML tags if any
-    title = title.replace(/<[^>]+>/g, '').trim();
-    
-    // Skip if title is too short or looks like navigation
-    if (title.length < 20) continue;
     
     // Make URL absolute
     if (url.startsWith('/')) {
       url = site.baseUrl + url;
     }
     
-    // Only include URLs from the target site
+    // Only include URLs that look like articles
     if (url.includes(site.baseUrl) && 
         !url.includes('#') && 
         !url.includes('javascript:') &&
         !url.includes('/search') &&
-        !url.includes('/tag/')) {
+        !url.includes('/tag/') &&
+        title.length > 20 &&
+        !articles.find(a => a.url === url)) {
       articles.push({ title, url });
     }
   }
   
-  // Pattern 2: Look for h3/h4 headlines with links
-  const headlinePattern = /<h[34][^>]*><a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a><\/h[34]>/gi;
-  while ((match = headlinePattern.exec(html)) !== null) {
-    let url = match[1];
-    let title = match[2].trim();
-    
-    if (url.startsWith('/')) {
-      url = site.baseUrl + url;
-    }
-    
-    if (url.includes(site.baseUrl) && title.length > 20) {
-      articles.push({ title, url });
-    }
-  }
-  
-  // Pattern 3: data-* attributes that might contain article info
-  const dataPattern = /data-href=["']([^"']+)["'][^>]*data-title=["']([^"']+)["']/gi;
-  while ((match = dataPattern.exec(html)) !== null) {
-    let url = match[1];
-    let title = match[2].trim();
-    
-    if (url.startsWith('/')) {
-      url = site.baseUrl + url;
-    }
-    
-    if (url.includes(site.baseUrl) && title.length > 20) {
-      articles.push({ title, url });
-    }
-  }
-  
+  Logger.log(`Extracted ${articles.length} articles using patterns`);
   return articles;
 }
 
