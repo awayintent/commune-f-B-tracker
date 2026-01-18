@@ -435,20 +435,16 @@ function addReviewColumns() {
 
 /**
  * RSS feed sources for Singapore F&B news
- * Note: Some feeds may have XML parsing issues. The script will skip problematic feeds.
+ * Note: Only using verified working RSS feeds
  */
 const RSS_FEEDS = [
-  // Major news outlets
-  'https://www.channelnewsasia.com/rss/food',
-  
-  // Food blogs (WordPress feeds are usually reliable)
+  // Food blogs (WordPress feeds are reliable)
   'https://sethlui.com/feed/',
   'https://danielfooddiary.com/feed/',
   'https://www.eatbook.sg/feed/',
   
-  // Alternative sources (uncomment if needed)
-  // 'https://www.straitstimes.com/rss/food',  // May have XML issues
-  // 'https://mothership.sg/feed/',  // May have XML issues
+  // Note: Straits Times and Mothership don't have working RSS feeds
+  // We'll need to scrape their sites directly or use their APIs
 ];
 
 /**
@@ -470,7 +466,8 @@ function analyzeHeadlineWithAI(headline, url, publisher) {
   const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
   
   if (!apiKey) {
-    Logger.log('OPENAI_API_KEY not set. Falling back to keyword matching.');
+    Logger.log('⚠️ OPENAI_API_KEY not set in Script Properties. Falling back to keyword matching.');
+    Logger.log('To fix: Go to Project Settings > Script Properties > Add OPENAI_API_KEY');
     return {
       isClosure: true, // Assume true if no API key (conservative)
       businessName: extractBusinessName(headline),
@@ -478,6 +475,8 @@ function analyzeHeadlineWithAI(headline, url, publisher) {
       reason: 'No AI analysis (API key missing)'
     };
   }
+  
+  Logger.log(`🤖 Analyzing with AI: "${headline}"`);
   
   const prompt = `You are analyzing Singapore F&B news headlines to identify actual business closures.
 
