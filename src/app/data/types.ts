@@ -11,6 +11,7 @@ export interface Closure {
   description: string;
   source_urls: string;
   tags: string;
+  published: boolean;
 }
 
 export interface MonthlyCounts {

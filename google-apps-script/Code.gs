@@ -56,7 +56,8 @@ const CLOSURES_COLUMNS = {
   last_day: 6,
   description: 7,
   source_urls: 8,
-  tags: 9
+  tags: 9,
+  published: 10  // TRUE/FALSE - controls public visibility
 };
 
 // Review columns (added to the right of form columns in Submissions sheet)
@@ -346,18 +347,27 @@ function acceptSubmission(row) {
   // Generate closure ID
   const closureId = getNextClosureId();
   
+  // Check if required fields are filled for auto-publish
+  const businessName = data[FORM_COLUMNS['Business Name']];
+  const address = data[FORM_COLUMNS['Business Address']];
+  const lastDay = data[FORM_COLUMNS['Last Day of Operation']];
+  
+  // Auto-publish only if all required fields are present
+  const canPublish = businessName && address && lastDay;
+  
   // Create closure record
   const closureRow = [
     closureId,                                        // closure_id
     new Date(),                                       // added_at
-    data[FORM_COLUMNS['Business Name']],            // business_name
+    businessName,                                     // business_name
     data[FORM_COLUMNS['Outlet/Branch Name']],       // outlet_name
-    data[FORM_COLUMNS['Business Address']],         // address
+    address,                                          // address
     '',                                               // category - to be filled manually
-    data[FORM_COLUMNS['Last Day of Operation']],    // last_day
+    lastDay,                                          // last_day
     data[FORM_COLUMNS['Reason for Closure']],       // description
     data[FORM_COLUMNS['Source URL']],               // source_urls
-    ''                                                // tags - to be filled manually
+    '',                                               // tags - to be filled manually
+    canPublish                                        // published - TRUE if all required fields present
   ];
   
   // Append to Closures sheet
@@ -1194,24 +1204,25 @@ function addManualArticles() {
 }
 
 /**
- * Convert selected candidates to draft submissions
- * Admin should first review candidates and mark promising ones as 'queued'
- * This function converts 'queued' candidates to submissions
+ * Promote candidates directly to Closures (bypasses Submissions)
+ * Admin should mark candidates as 'approved' to trigger this
+ * Includes duplicate checking against existing closures
  */
-function draftSubmissionsFromCandidates() {
+function promoteCandidatesToClosures() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const candidatesSheet = ss.getSheetByName(SHEET_NAMES.CANDIDATES);
-  const submissionsSheet = ss.getSheetByName(SHEET_NAMES.SUBMISSIONS);
+  const closuresSheet = ss.getSheetByName(SHEET_NAMES.CLOSURES);
   
-  if (!candidatesSheet || !submissionsSheet) {
+  if (!candidatesSheet || !closuresSheet) {
     Logger.log('Required sheets not found');
     return;
   }
   
   const data = candidatesSheet.getDataRange().getValues();
-  let drafted = 0;
+  let promoted = 0;
+  let skipped = 0;
   
-  // Process each candidate with status 'queued' or 'new' (for high-confidence ones)
+  // Process each candidate with status 'approved'
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const candidateId = row[0];
@@ -1227,34 +1238,79 @@ function draftSubmissionsFromCandidates() {
     const aiReason = row[10];
     const status = row[11];
     
-    // Only process queued items (admin-approved) or high-confidence new items
-    if (status === 'queued' || (status === 'new' && confidenceScore >= 0.9)) {
-      // Create a draft submission
-      const submissionRow = [
-        new Date(), // Timestamp
-        businessName || headline, // Business Name
-        '', // Outlet/Branch Name
-        '', // Business address
-        '', // Last Day of Operation
-        `Closure reported by ${publisher}`, // Reason for Closure
-        url, // Source URL
-        `Headline: ${headline}\nAI Analysis: ${aiReason}\nMatched terms: ${matchedTerms}`, // Additional Notes
-        'System (RSS)', // Submitter Name
-        publisher // Submitter Contact
+    // Only process approved candidates
+    if (status === 'approved') {
+      // Check for duplicates
+      const isDuplicate = checkDuplicateInClosures(closuresSheet, businessName);
+      
+      if (isDuplicate) {
+        Logger.log(`Skipping duplicate: ${businessName}`);
+        candidatesSheet.getRange(i + 1, 12).setValue('duplicate');
+        skipped++;
+        continue;
+      }
+      
+      // Generate closure ID
+      const closureId = getNextClosureId();
+      
+      // Check if we have enough info to auto-publish
+      const canPublish = businessName && areaGuess; // Candidates need at least name and area
+      
+      // Create closure record
+      const closureRow = [
+        closureId,                                    // closure_id
+        new Date(),                                   // added_at
+        businessName,                                 // business_name
+        '',                                           // outlet_name - empty for candidates
+        areaGuess || '',                              // address - use area guess
+        '',                                           // category - to be filled manually
+        publishedAt || '',                            // last_day - use article published date
+        `Closure reported by ${publisher}. ${aiReason}`, // description
+        url,                                          // source_urls
+        '',                                           // tags - to be filled manually
+        canPublish                                    // published - auto-publish if name + area present
       ];
       
-      submissionsSheet.appendRow(submissionRow);
+      // Append to Closures sheet
+      closuresSheet.appendRow(closureRow);
       
       // Update candidate status to 'promoted'
       candidatesSheet.getRange(i + 1, 12).setValue('promoted');
+      candidatesSheet.getRange(i + 1, 13).setValue(closureId);
       
-      drafted++;
+      promoted++;
+      
+      Logger.log(`Promoted candidate ${candidateId} → ${closureId}`);
     }
   }
   
-  Logger.log(`Drafted ${drafted} submissions from candidates`);
+  Logger.log(`Promoted ${promoted} candidates, skipped ${skipped} duplicates`);
   
-  if (drafted > 0) {
-    sendTelegram(`📝 Created ${drafted} draft submission(s) from RSS candidates. Review in SUBMISSIONS sheet.`);
+  if (promoted > 0) {
+    sendTelegram(`✅ Promoted ${promoted} candidate(s) to Closures. ${skipped} duplicates skipped.`);
   }
+}
+
+/**
+ * Check if a business name already exists in Closures sheet
+ */
+function checkDuplicateInClosures(closuresSheet, businessName) {
+  if (!businessName || businessName.trim() === '') {
+    return false;
+  }
+  
+  const normalizedName = normalize(businessName);
+  const lastRow = closuresSheet.getLastRow();
+  
+  if (lastRow > 1) {
+    const businessNames = closuresSheet.getRange(2, 3, lastRow - 1, 1).getValues();
+    for (let i = 0; i < businessNames.length; i++) {
+      const existingName = businessNames[i][0];
+      if (existingName && normalize(existingName) === normalizedName) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
 }

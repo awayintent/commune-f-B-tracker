@@ -46,11 +46,11 @@ function parseCSV(csvText: string): Closure[] {
     // Simple CSV parser - handles quoted fields
     const fields = parseCSVLine(line);
     
-    if (fields.length < 10) {
+    if (fields.length < 11) {
       continue; // Skip incomplete rows
     }
 
-    closures.push({
+    const closure = {
       closure_id: fields[0] || '',
       added_at: fields[1] || '',
       business_name: fields[2] || '',
@@ -61,7 +61,13 @@ function parseCSV(csvText: string): Closure[] {
       description: fields[7] || '',
       source_urls: fields[8] || '',
       tags: fields[9] || '',
-    });
+      published: fields[10] === 'TRUE' || fields[10] === true,
+    };
+
+    // Only include published closures
+    if (closure.published) {
+      closures.push(closure);
+    }
   }
 
   return closures;
