@@ -128,6 +128,7 @@ export function BurntEndStories() {
                     <BookOpen className="w-12 h-12 text-white/50" />
                   </div>
                 )}
+              </div>
 
               {/* Content */}
               <CardContent className="p-5">
