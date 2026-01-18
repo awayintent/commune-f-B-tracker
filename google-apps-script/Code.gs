@@ -434,14 +434,20 @@ function addReviewColumns() {
 
 /**
  * RSS feed sources for Singapore F&B news
+ * Note: Some feeds may have XML parsing issues. The script will skip problematic feeds.
  */
 const RSS_FEEDS = [
-  'https://www.straitstimes.com/rss/food',
+  // Major news outlets
   'https://www.channelnewsasia.com/rss/food',
-  'https://mothership.sg/feed/',
+  
+  // Food blogs (WordPress feeds are usually reliable)
   'https://sethlui.com/feed/',
   'https://danielfooddiary.com/feed/',
-  'https://www.eatbook.sg/feed/'
+  'https://www.eatbook.sg/feed/',
+  
+  // Alternative sources (uncomment if needed)
+  // 'https://www.straitstimes.com/rss/food',  // May have XML issues
+  // 'https://mothership.sg/feed/',  // May have XML issues
 ];
 
 /**
@@ -515,14 +521,23 @@ function fetchCandidates() {
   // Fetch each RSS feed
   RSS_FEEDS.forEach(feedUrl => {
     try {
-      const response = UrlFetchApp.fetch(feedUrl, { muteHttpExceptions: true });
+      const response = UrlFetchApp.fetch(feedUrl, { 
+        muteHttpExceptions: true,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CommuneBot/1.0)'
+        }
+      });
       
       if (response.getResponseCode() !== 200) {
         Logger.log(`Failed to fetch ${feedUrl}: ${response.getResponseCode()}`);
         return;
       }
       
-      const xml = response.getContentText();
+      let xml = response.getContentText();
+      
+      // Clean up common XML issues
+      xml = cleanXml(xml);
+      
       const document = XmlService.parse(xml);
       const root = document.getRootElement();
       
@@ -537,8 +552,13 @@ function fetchCandidates() {
       items.forEach(item => {
         try {
           const headline = getElementText(item, 'title');
-          const url = getElementText(item, 'link');
+          let url = getElementText(item, 'link');
           const pubDate = getElementText(item, 'pubDate') || getElementText(item, 'published');
+          
+          // For Atom feeds, link might be an attribute
+          if (!url && item.getChild('link')) {
+            url = item.getChild('link').getAttribute('href')?.getValue();
+          }
           
           if (!headline || !url || existingUrls.has(url)) {
             return;
@@ -592,6 +612,23 @@ function fetchCandidates() {
   if (newCandidates > 0) {
     sendTelegram(`🔍 Found ${newCandidates} new closure candidate(s) from RSS feeds. Review in CANDIDATES sheet.`);
   }
+}
+
+/**
+ * Clean up common XML issues that cause parsing errors
+ */
+function cleanXml(xml) {
+  // Remove BOM (Byte Order Mark) if present
+  xml = xml.replace(/^\uFEFF/, '');
+  
+  // Remove any whitespace before XML declaration
+  xml = xml.trim();
+  
+  // Fix common entity issues - escape unescaped ampersands
+  // This regex looks for & not followed by valid entity patterns
+  xml = xml.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
+  
+  return xml;
 }
 
 /**
