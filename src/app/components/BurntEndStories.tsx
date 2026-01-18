@@ -18,46 +18,57 @@ export function BurntEndStories() {
   useEffect(() => {
     async function fetchStories() {
       try {
-        // Use RSS2JSON service to convert RSS to JSON (avoids CORS issues)
+        // Fetch RSS feed directly
         const rssUrl = 'https://www.commune-asia.com/feed';
-        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=20`;
         
-        const response = await fetch(apiUrl);
+        const response = await fetch(rssUrl);
         if (!response.ok) {
           throw new Error('Failed to fetch RSS feed');
         }
         
-        const data = await response.json();
+        const xmlText = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
         
-        console.log('RSS feed data:', data);
-        console.log('Total items:', data.items?.length);
+        // Get all items from RSS
+        const items = Array.from(xmlDoc.querySelectorAll('item'));
         
-        // Filter for Burnt End stories only (title contains "Burnt End" - case insensitive)
-        const burntEndStories = data.items
-          .filter((item: any) => {
-            const title = item.title || '';
+        console.log('Total RSS items:', items.length);
+        
+        // Filter for Burnt End stories only
+        const burntEndStories = items
+          .filter((item) => {
+            const title = item.querySelector('title')?.textContent || '';
             const isBurntEnd = title.toLowerCase().includes('burnt end');
             console.log(`Article: "${title}" - Is Burnt End: ${isBurntEnd}`);
             return isBurntEnd;
           })
           .slice(0, 3) // Get only the 3 most recent
-          .map((item: any) => {
-            // Extract image from enclosure or content
-            let imageUrl = item.enclosure?.link || item.thumbnail || '';
+          .map((item) => {
+            const title = item.querySelector('title')?.textContent || '';
+            const description = item.querySelector('description')?.textContent || '';
+            const link = item.querySelector('link')?.textContent || '';
+            const pubDate = item.querySelector('pubDate')?.textContent || '';
             
-            // If no image found, try to extract from content
-            if (!imageUrl && item.content) {
-              const imgMatch = item.content.match(/<img[^>]+src="([^">]+)"/);
+            // Extract image from enclosure
+            const enclosure = item.querySelector('enclosure');
+            let imageUrl = enclosure?.getAttribute('url') || '';
+            
+            // If no enclosure, try to extract from content:encoded
+            if (!imageUrl) {
+              const content = item.querySelector('content\\:encoded')?.textContent || 
+                             item.getElementsByTagName('content:encoded')[0]?.textContent || '';
+              const imgMatch = content.match(/<img[^>]+src="([^">]+)"/);
               if (imgMatch) {
                 imageUrl = imgMatch[1];
               }
             }
             
             // Clean up the title (remove "Burnt Ends:" or "Burnt End:" prefix)
-            const cleanTitle = item.title.replace(/^Burnt Ends?:\s*/i, '');
+            const cleanTitle = title.replace(/^Burnt Ends?:\s*/i, '');
             
             // Format date
-            const date = new Date(item.pubDate);
+            const date = new Date(pubDate);
             const formattedDate = date.toLocaleDateString('en-US', {
               month: 'short',
               day: 'numeric',
@@ -66,8 +77,8 @@ export function BurntEndStories() {
             
             return {
               title: cleanTitle,
-              excerpt: item.description || '',
-              url: item.link,
+              excerpt: description,
+              url: link,
               imageUrl: imageUrl,
               date: formattedDate
             };
