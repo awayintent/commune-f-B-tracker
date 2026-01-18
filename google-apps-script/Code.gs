@@ -449,13 +449,15 @@ const RSS_FEEDS = [
 const SCRAPE_SITES = [
   {
     name: 'The Straits Times',
-    url: 'https://www.straitstimes.com/',
-    type: 'html'
+    searchUrl: 'https://www.straitstimes.com/search?q=',
+    baseUrl: 'https://www.straitstimes.com',
+    type: 'search'
   },
   {
     name: 'CNA',
-    url: 'https://channelnewsasia.com/',
-    type: 'html'
+    searchUrl: 'https://www.channelnewsasia.com/api/v1/search?q=',
+    baseUrl: 'https://www.channelnewsasia.com',
+    type: 'api'
   }
 ];
 
@@ -839,43 +841,41 @@ function processScrapeSites(sheet, existingUrls, nextCandidateId) {
 }
 
 /**
- * Search a site for closure-related articles using Google Search
+ * Search a site for closure-related articles
  * Returns array of {title, url} objects
  */
 function searchSiteForClosures(site) {
   const articles = [];
+  const searchTerms = [
+    'restaurant closing',
+    'cafe closing',
+    'bar closing',
+    'restaurant closed',
+    'cafe closed',
+    'last day',
+    'farewell',
+    'shuttered'
+  ];
   
-  // Build search query for closure-related articles since Jan 1, 2025
-  const domain = site.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-  const closureTerms = ['close', 'closes', 'closed', 'closing', 'shut', 'shutter', 'farewell', 'last day'];
-  
-  // Search for each closure term
-  closureTerms.forEach(term => {
+  searchTerms.forEach(term => {
     try {
-      // Google Custom Search API query
-      // Format: site:domain "term" after:2025-01-01
-      const query = `site:${domain} "${term}" restaurant OR cafe OR bar after:2025-01-01`;
+      let results = [];
       
-      // Use Google's search (scraping search results)
-      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20`;
-      
-      const response = UrlFetchApp.fetch(searchUrl, {
-        muteHttpExceptions: true,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      
-      if (response.getResponseCode() === 200) {
-        const html = response.getContentText();
-        const results = parseGoogleSearchResults(html, site.url);
-        articles.push(...results);
-        
-        // Small delay to avoid rate limiting
-        Utilities.sleep(2000);
+      if (site.type === 'api') {
+        // CNA has a search API
+        results = searchCNA(term, site);
+      } else {
+        // Straits Times - scrape search page
+        results = searchStraitsTimes(term, site);
       }
+      
+      articles.push(...results);
+      
+      // Delay to avoid rate limiting
+      Utilities.sleep(1000);
+      
     } catch (error) {
-      Logger.log(`Error searching for "${term}": ${error}`);
+      Logger.log(`Error searching ${site.name} for "${term}": ${error}`);
     }
   });
   
@@ -889,49 +889,121 @@ function searchSiteForClosures(site) {
 }
 
 /**
- * Parse Google search results HTML to extract article links
+ * Search CNA using their API
  */
-function parseGoogleSearchResults(html, baseUrl) {
+function searchCNA(term, site) {
   const articles = [];
   
-  // Google search results pattern: <a href="/url?q=ACTUAL_URL&...">
-  // We need to extract the actual URL and the title
-  const resultPattern = /<a[^>]*href="\/url\?q=([^&"]+)[^"]*"[^>]*><br><div[^>]*><div[^>]*>([^<]+)<\/div>/gi;
-  let match;
-  
-  while ((match = resultPattern.exec(html)) !== null) {
-    try {
-      let url = decodeURIComponent(match[1]);
-      const title = match[2].trim();
-      
-      // Only include URLs from the target site
-      if (url.includes(baseUrl) && title.length > 15) {
-        articles.push({ title, url });
+  try {
+    // CNA search API endpoint
+    const searchUrl = `${site.searchUrl}${encodeURIComponent(term)}&categories=food&page=1&pageSize=20`;
+    
+    const response = UrlFetchApp.fetch(searchUrl, {
+      muteHttpExceptions: true,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CommuneBot/1.0)',
+        'Accept': 'application/json'
       }
-    } catch (e) {
-      // Skip malformed results
+    });
+    
+    if (response.getResponseCode() === 200) {
+      const data = JSON.parse(response.getContentText());
+      
+      // Parse CNA API response
+      if (data.results && Array.isArray(data.results)) {
+        data.results.forEach(result => {
+          if (result.title && result.url) {
+            // Filter for 2025 articles
+            const pubDate = new Date(result.publishedDate || result.createdDate);
+            if (pubDate >= new Date('2025-01-01')) {
+              articles.push({
+                title: result.title,
+                url: result.url.startsWith('http') ? result.url : site.baseUrl + result.url
+              });
+            }
+          }
+        });
+      }
     }
+  } catch (error) {
+    Logger.log(`CNA API error: ${error}`);
   }
   
-  // Alternative pattern for newer Google search results
-  const altPattern = /<a[^>]*href="([^"]+)"[^>]*><h3[^>]*>([^<]+)<\/h3>/gi;
-  while ((match = altPattern.exec(html)) !== null) {
-    try {
-      let url = match[1];
-      const title = match[2].trim();
+  return articles;
+}
+
+/**
+ * Search Straits Times by scraping their search page
+ */
+function searchStraitsTimes(term, site) {
+  const articles = [];
+  
+  try {
+    const searchUrl = `${site.searchUrl}${encodeURIComponent(term)}`;
+    
+    const response = UrlFetchApp.fetch(searchUrl, {
+      muteHttpExceptions: true,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html'
+      }
+    });
+    
+    if (response.getResponseCode() === 200) {
+      const html = response.getContentText();
       
-      // Clean up Google redirect URLs
-      if (url.startsWith('/url?q=')) {
-        url = decodeURIComponent(url.split('?q=')[1].split('&')[0]);
+      // Extract article links from search results
+      // ST uses various patterns, let's try multiple
+      
+      // Pattern 1: Standard article links
+      const pattern1 = /<a[^>]*href="(\/[^"]*)"[^>]*class="[^"]*story[^"]*"[^>]*>([^<]+)<\/a>/gi;
+      let match;
+      
+      while ((match = pattern1.exec(html)) !== null) {
+        const url = site.baseUrl + match[1];
+        const title = match[2].trim().replace(/<[^>]+>/g, '');
+        
+        if (title.length > 15 && !articles.find(a => a.url === url)) {
+          articles.push({ title, url });
+        }
       }
       
-      // Only include URLs from the target site
-      if (url.includes(baseUrl) && title.length > 15) {
-        articles.push({ title, url });
+      // Pattern 2: JSON-LD structured data
+      const jsonLdPattern = /<script type="application\/ld\+json">([^<]+)<\/script>/gi;
+      while ((match = jsonLdPattern.exec(html)) !== null) {
+        try {
+          const jsonData = JSON.parse(match[1]);
+          if (jsonData['@type'] === 'NewsArticle' && jsonData.headline && jsonData.url) {
+            const pubDate = new Date(jsonData.datePublished);
+            if (pubDate >= new Date('2025-01-01')) {
+              articles.push({
+                title: jsonData.headline,
+                url: jsonData.url
+              });
+            }
+          }
+        } catch (e) {
+          // Skip invalid JSON
+        }
       }
-    } catch (e) {
-      // Skip malformed results
+      
+      // Pattern 3: Generic article links with data attributes
+      const pattern3 = /<article[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>[\s\S]*?<h[0-9][^>]*>([^<]+)<\/h[0-9]>/gi;
+      while ((match = pattern3.exec(html)) !== null) {
+        let url = match[1];
+        const title = match[2].trim();
+        
+        if (!url.startsWith('http')) {
+          url = site.baseUrl + url;
+        }
+        
+        if (title.length > 15 && !articles.find(a => a.url === url)) {
+          articles.push({ title, url });
+        }
+      }
     }
+  } catch (error) {
+    Logger.log(`Straits Times scraping error: ${error}`);
   }
   
   return articles;
