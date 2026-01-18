@@ -108,126 +108,141 @@ export function ClosuresTable() {
   }
 
   return (
-    <div className="w-full space-y-4">
-      {/* Search Bar */}
-      <div className="flex items-center gap-2 max-w-md">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-          <Input
-            type="text"
-            placeholder="Search by name, location, category..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+    <div className="w-full">
+      {/* Container with space for ads */}
+      <div className="flex gap-6 items-start">
+        {/* Left ad space - reserved for future */}
+        <div className="hidden xl:block w-40 flex-shrink-0">
+          {/* Ad space placeholder */}
         </div>
-        {searchTerm && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSearchTerm('')}
-            className="text-gray-600"
-          >
-            Clear
-          </Button>
-        )}
-      </div>
 
-      {/* Results Count */}
-      <div className="text-sm text-gray-600">
-        Showing {sortedClosures.length} of {closures.length} closures
-      </div>
+        {/* Main content */}
+        <div className="flex-1 space-y-4">
+          {/* Search Bar */}
+          <div className="flex items-center gap-2 max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Input
+                type="text"
+                placeholder="Search by name, location, category..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            {searchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSearchTerm('')}
+                className="text-gray-600"
+              >
+                Clear
+              </Button>
+            )}
+          </div>
 
-      {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="font-semibold">
-                  <button
-                    onClick={() => handleSort('business_name')}
-                    className="flex items-center hover:text-[#f5903e] transition-colors"
-                  >
-                    Business Name
-                    <SortIcon field="business_name" />
-                  </button>
-                </TableHead>
-                <TableHead className="font-semibold">Outlet</TableHead>
-                <TableHead className="font-semibold">Address</TableHead>
-                <TableHead className="font-semibold">
-                  <button
-                    onClick={() => handleSort('category')}
-                    className="flex items-center hover:text-[#f5903e] transition-colors"
-                  >
-                    Category
-                    <SortIcon field="category" />
-                  </button>
-                </TableHead>
-                <TableHead className="font-semibold">
-                  <button
-                    onClick={() => handleSort('last_day')}
-                    className="flex items-center hover:text-[#f5903e] transition-colors"
-                  >
-                    Last Day
-                    <SortIcon field="last_day" />
-                  </button>
-                </TableHead>
-                <TableHead className="font-semibold">Description</TableHead>
-                <TableHead className="font-semibold text-center">Source</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedClosures.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                    {searchTerm ? 'No closures found matching your search.' : 'No closures recorded yet.'}
-                  </TableCell>
+          {/* Results Count */}
+          <div className="text-sm text-gray-600">
+            Showing {sortedClosures.length} of {closures.length} closures
+          </div>
+
+          {/* Table - no horizontal scroll needed */}
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50">
+                  <TableHead className="font-semibold w-[20%]">
+                    <button
+                      onClick={() => handleSort('business_name')}
+                      className="flex items-center hover:text-[#f5903e] transition-colors"
+                    >
+                      Business Name
+                      <SortIcon field="business_name" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="font-semibold w-[25%]">Address</TableHead>
+                  <TableHead className="font-semibold w-[12%]">
+                    <button
+                      onClick={() => handleSort('category')}
+                      className="flex items-center hover:text-[#f5903e] transition-colors"
+                    >
+                      Category
+                      <SortIcon field="category" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="font-semibold w-[12%]">
+                    <button
+                      onClick={() => handleSort('last_day')}
+                      className="flex items-center hover:text-[#f5903e] transition-colors"
+                    >
+                      Last Day
+                      <SortIcon field="last_day" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="font-semibold w-[28%]">Reason for Closure</TableHead>
+                  <TableHead className="font-semibold text-center w-[3%]">Link</TableHead>
                 </TableRow>
-              ) : (
-                sortedClosures.map((closure) => (
-                  <TableRow key={closure.closure_id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">{closure.business_name}</TableCell>
-                    <TableCell className="text-gray-600">
-                      {closure.outlet_name || '-'}
-                    </TableCell>
-                    <TableCell className="text-gray-600 max-w-xs truncate">
-                      {closure.address || '-'}
-                    </TableCell>
-                    <TableCell>
-                      {closure.category ? (
-                        <Badge variant="secondary" className="bg-[#0b3860] text-white">
-                          {closure.category}
-                        </Badge>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-gray-600">
-                      {closure.last_day ? formatDate(closure.last_day) : '-'}
-                    </TableCell>
-                    <TableCell className="text-gray-600 max-w-md truncate">
-                      {closure.description || '-'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {closure.source_urls ? (
-                        <a
-                          href={closure.source_urls.split(',')[0].trim()}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[#f5903e] hover:text-[#e07d2a] transition-colors"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
+              </TableHeader>
+              <TableBody>
+                {sortedClosures.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                      {searchTerm ? 'No closures found matching your search.' : 'No closures recorded yet.'}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  sortedClosures.map((closure) => (
+                    <TableRow key={closure.closure_id} className="hover:bg-gray-50">
+                      <TableCell className="font-medium">
+                        <div className="line-clamp-2">
+                          {closure.business_name}
+                          {closure.outlet_name && <span className="text-sm text-gray-500 block">{closure.outlet_name}</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-gray-600">
+                        <div className="line-clamp-2">{closure.address || '-'}</div>
+                      </TableCell>
+                      <TableCell>
+                        {closure.category ? (
+                          <Badge variant="secondary" className="bg-[#0b3860] text-white whitespace-nowrap">
+                            {closure.category}
+                          </Badge>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-gray-600 whitespace-nowrap">
+                        {closure.last_day ? formatDate(closure.last_day) : '-'}
+                      </TableCell>
+                      <TableCell className="text-gray-600">
+                        <div className="line-clamp-2">{closure.description || '-'}</div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {closure.source_urls ? (
+                          <a
+                            href={closure.source_urls.split(',')[0].trim()}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[#f5903e] hover:text-[#e07d2a] transition-colors"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+
+        {/* Right ad space - reserved for future */}
+        <div className="hidden xl:block w-40 flex-shrink-0">
+          {/* Ad space placeholder */}
         </div>
       </div>
     </div>

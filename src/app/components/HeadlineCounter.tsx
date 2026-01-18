@@ -123,9 +123,9 @@ export function HeadlineCounter() {
           F&B Businesses Closed in{' '}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <button className="underline decoration-2 hover:decoration-4 transition-all cursor-pointer inline-flex items-center gap-2 text-[#f5903e]">
+              <button className="underline decoration-2 hover:decoration-4 transition-all cursor-pointer inline items-baseline gap-2 text-[#f5903e] text-xl md:text-3xl">
                 {getPeriodText()}
-                <Calendar className="w-6 h-6 inline" />
+                <Calendar className="w-5 h-5 md:w-6 md:h-6 inline align-text-bottom" />
               </button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">

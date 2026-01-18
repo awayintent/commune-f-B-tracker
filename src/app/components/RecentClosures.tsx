@@ -62,14 +62,19 @@ export function RecentClosures() {
       <h2 className="text-3xl font-bold mb-8 text-center text-[#0b3860]">Most Recent Closures</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {recentClosures.map((closure) => (
-          <Card key={closure.closure_id} className="hover:shadow-lg transition-shadow border-[#0b3860]/20">
-            <CardHeader className="bg-[#0b3860] items-center min-h-[80px] flex justify-center">
-              <CardTitle className="text-xl text-white text-center">
+          <Card key={closure.closure_id} className="hover:shadow-lg transition-shadow border-[#0b3860]/20 overflow-hidden">
+            {/* Header with background image placeholder - 50% opacity overlay */}
+            <CardHeader 
+              className="relative items-center min-h-[120px] flex justify-center bg-cover bg-center"
+              style={{
+                backgroundImage: `linear-gradient(rgba(11, 56, 96, 0.5), rgba(11, 56, 96, 0.5)), url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=200&fit=crop')`
+              }}
+            >
+              <CardTitle className="text-xl text-white text-center z-10 drop-shadow-lg">
                 {closure.business_name}
-                {closure.outlet_name && ` - ${closure.outlet_name}`}
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-4">
+            <CardContent className="pt-4 bg-white">
               <div className="space-y-2">
                 {closure.category && (
                   <p className="text-sm text-gray-600">
@@ -86,11 +91,6 @@ export function RecentClosures() {
                   <Clock className="w-4 h-4 text-[#f5903e]" />
                   <span>{formatDate(closure.last_day || closure.added_at)}</span>
                 </p>
-                {closure.status === 'Confirmed' && (
-                  <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                    Confirmed
-                  </span>
-                )}
               </div>
             </CardContent>
           </Card>
