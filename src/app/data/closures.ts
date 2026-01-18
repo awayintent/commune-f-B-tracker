@@ -46,7 +46,8 @@ function parseCSV(csvText: string): Closure[] {
     // Simple CSV parser - handles quoted fields
     const fields = parseCSVLine(line);
     
-    if (fields.length < 11) {
+    // Need at least business name to be valid
+    if (fields.length < 3 || !fields[2]) {
       continue; // Skip incomplete rows
     }
 
@@ -61,7 +62,8 @@ function parseCSV(csvText: string): Closure[] {
       description: fields[7] || '',
       source_urls: fields[8] || '',
       tags: fields[9] || '',
-      published: fields[10] === 'TRUE' || fields[10] === true,
+      // Check if published column exists and is TRUE, otherwise default to true for backward compatibility
+      published: fields.length > 10 ? (fields[10] === 'TRUE' || fields[10] === 'true') : true,
     };
 
     // Only include published closures
