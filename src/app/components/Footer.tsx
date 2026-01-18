@@ -20,11 +20,6 @@ export function Footer() {
             <h3 className="text-lg font-bold text-[#0b3860] mb-3">
               Singapore F&B Closures Tracker
             </h3>
-            <p className="text-sm text-gray-600 mb-4 max-w-md">
-              A comprehensive database tracking F&B business closures in Singapore. 
-              Powered by community contributions and curated by <span className="font-semibold">COMMUNE</span>, 
-              a weekly newsletter covering the business and operational realities of the F&B industry in Southeast Asia.
-            </p>
             <Button 
               onClick={handleSubscribe}
               className="bg-[#f5903e] hover:bg-[#e07d2a] text-white font-semibold"
@@ -64,11 +59,9 @@ export function Footer() {
           {/* About Column */}
           <div>
             <h4 className="font-semibold text-[#0b3860] mb-3">About</h4>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li>Community-powered data</li>
-              <li>Updated regularly</li>
-              <li>Free to access</li>
-            </ul>
+            <p className="text-sm text-gray-600">
+              Commune is a weekly newsletter covering the business and operational realities of the F&B industry in Southeast Asia.
+            </p>
           </div>
         </div>
 
