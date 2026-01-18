@@ -437,29 +437,20 @@ function addReviewColumns() {
  * RSS feed sources for Singapore F&B news
  */
 const RSS_FEEDS = [
+  // Major news outlets - Straits Times
+  'https://www.straitstimes.com/news/life/rss.xml',
+  'https://www.straitstimes.com/news/singapore/rss.xml',
+  
+  // Major news outlets - CNA
+  'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=10416', // CNA Singapore
+  'https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml&category=679471', // CNA Today
+  
   // Food blogs (WordPress feeds are reliable)
   'https://sethlui.com/feed/',
   'https://danielfooddiary.com/feed/',
   'https://www.eatbook.sg/feed/',
 ];
 
-/**
- * News sites to scrape directly (non-RSS)
- */
-const SCRAPE_SITES = [
-  {
-    name: 'The Straits Times',
-    searchUrl: 'https://www.straitstimes.com/search?searchkey=',
-    baseUrl: 'https://www.straitstimes.com',
-    type: 'html'
-  },
-  {
-    name: 'CNA',
-    searchUrl: 'https://www.channelnewsasia.com/search?q=',
-    baseUrl: 'https://www.channelnewsasia.com',
-    type: 'html'
-  }
-];
 
 /**
  * Keywords for initial filtering (broad match to reduce API calls)
@@ -630,11 +621,8 @@ function fetchCandidates() {
   const scriptProps = PropertiesService.getScriptProperties();
   let nextCandidateId = parseInt(scriptProps.getProperty('NEXT_CANDIDATE_ID') || '1');
   
-  // Process RSS feeds
+  // Process all RSS feeds (now includes ST and CNA!)
   newCandidates += processRSSFeeds(sheet, existingUrls, nextCandidateId);
-  
-  // Process HTML scraping sites
-  newCandidates += processScrapeSites(sheet, existingUrls, nextCandidateId);
   
   // Save next candidate ID
   scriptProps.setProperty('NEXT_CANDIDATE_ID', nextCandidateId.toString());
@@ -756,21 +744,54 @@ function processRSSFeeds(sheet, existingUrls, nextCandidateId) {
 }
 
 /**
- * Process HTML scraping sites (Straits Times, CNA)
- * Uses Google Search to find articles from Jan 1, 2025 onwards
+ * Process category pages from ST and CNA
+ * Scrapes recent articles from food/dining sections
  */
-function processScrapeSites(sheet, existingUrls, nextCandidateId) {
+function processCategoryPages(sheet, existingUrls, nextCandidateId) {
   let newCandidates = 0;
   const scriptProps = PropertiesService.getScriptProperties();
   
   SCRAPE_SITES.forEach(site => {
     try {
-      Logger.log(`Searching ${site.name} for articles since Jan 1, 2025`);
+      Logger.log(`Scraping ${site.name} category pages`);
       
-      // Use Google Search to find recent articles about closures
-      const articles = searchSiteForClosures(site);
+      const articles = [];
       
-      Logger.log(`Found ${articles.length} articles from ${site.name}`);
+      // Scrape each category URL
+      site.urls.forEach(categoryUrl => {
+        Logger.log(`  Fetching: ${categoryUrl}`);
+        
+        try {
+          const response = UrlFetchApp.fetch(categoryUrl, {
+            muteHttpExceptions: true,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'text/html'
+            }
+          });
+          
+          if (response.getResponseCode() === 200) {
+            const html = response.getContentText();
+            const categoryArticles = extractArticlesFromCategoryPage(html, site);
+            Logger.log(`  Found ${categoryArticles.length} articles`);
+            articles.push(...categoryArticles);
+          }
+          
+          Utilities.sleep(1000);
+        } catch (error) {
+          Logger.log(`  Error fetching ${categoryUrl}: ${error}`);
+        }
+      });
+      
+      // Remove duplicates
+      const seen = new Set();
+      const uniqueArticles = articles.filter(article => {
+        if (seen.has(article.url)) return false;
+        seen.add(article.url);
+        return true;
+      });
+      
+      Logger.log(`Found ${uniqueArticles.length} unique articles from ${site.name}`);
       
       articles.forEach(article => {
         try {
@@ -853,168 +874,55 @@ function processScrapeSites(sheet, existingUrls, nextCandidateId) {
 }
 
 /**
- * Search a site for closure-related articles
- * Returns array of {title, url} objects
+ * Extract articles from category/section pages
  */
-function searchSiteForClosures(site) {
-  const articles = [];
-  const searchTerms = [
-    'restaurant closing',
-    'cafe closing',
-    'bar closing',
-    'restaurant closed',
-    'cafe closed',
-    'last day',
-    'farewell',
-    'shuttered'
-  ];
-  
-  searchTerms.forEach(term => {
-    try {
-      Logger.log(`Searching ${site.name} for: ${term}`);
-      
-      // Build search URL with proper encoding
-      let searchUrl;
-      if (site.name === 'The Straits Times') {
-        searchUrl = `${site.searchUrl}${encodeURIComponent(term)}&sort=relevancydate`;
-      } else {
-        searchUrl = `${site.searchUrl}${encodeURIComponent(term)}`;
-      }
-      
-      const response = UrlFetchApp.fetch(searchUrl, {
-        muteHttpExceptions: true,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html'
-        }
-      });
-      
-      if (response.getResponseCode() === 200) {
-        const html = response.getContentText();
-        
-        // Debug: Log a snippet of the HTML to see structure
-        const snippet = html.substring(0, 2000);
-        Logger.log(`HTML snippet: ${snippet.substring(0, 500)}...`);
-        
-        const results = extractArticlesFromSearchPage(html, site);
-        Logger.log(`Found ${results.length} results for "${term}"`);
-        
-        // Log first few results for debugging
-        if (results.length > 0) {
-          results.slice(0, 3).forEach(r => {
-            Logger.log(`  - ${r.title.substring(0, 60)}... | ${r.url}`);
-          });
-        }
-        
-        articles.push(...results);
-      } else {
-        Logger.log(`Failed to fetch search results: ${response.getResponseCode()}`);
-      }
-      
-      // Delay to avoid rate limiting
-      Utilities.sleep(1500);
-      
-    } catch (error) {
-      Logger.log(`Error searching ${site.name} for "${term}": ${error}`);
-    }
-  });
-  
-  // Remove duplicates
-  const seen = new Set();
-  return articles.filter(article => {
-    if (seen.has(article.url)) return false;
-    seen.add(article.url);
-    return true;
-  });
-}
-
-/**
- * Extract articles from search results HTML
- * Works for both CNA and Straits Times
- */
-function extractArticlesFromSearchPage(html, site) {
+function extractArticlesFromCategoryPage(html, site) {
   const articles = [];
   
-  // For Straits Times - based on the screenshot, articles are in specific structure
-  if (site.name === 'The Straits Times') {
-    // ST Pattern: Look for article titles and dates
-    // The structure shows: headline, date, and link
-    const stPattern = /<h[2-4][^>]*>([^<]+)<\/h[2-4]>[\s\S]{0,200}?<a[^>]*href=["']([^"']+)["']/gi;
-    let match;
-    
-    while ((match = stPattern.exec(html)) !== null) {
-      let title = match[1].trim();
-      let url = match[2];
-      
-      if (url.startsWith('/')) {
-        url = site.baseUrl + url;
-      }
-      
-      if (title.length > 15 && url.includes('/life/') || url.includes('/food/') || url.includes('/singapore/')) {
-        articles.push({ title, url });
-      }
-    }
-    
-    // Alternative ST pattern: link contains the title
-    const stPattern2 = /<a[^>]*href=["'](\/[^"']+)["'][^>]*>[\s\S]{0,50}?([^<]{20,}?)<\/a>/gi;
-    while ((match = stPattern2.exec(html)) !== null) {
-      let url = site.baseUrl + match[1];
-      let title = match[2].trim().replace(/<[^>]+>/g, '');
-      
-      if (title.length > 15 && !articles.find(a => a.url === url)) {
-        articles.push({ title, url });
-      }
-    }
-  }
-  
-  // For CNA - different structure
-  if (site.name === 'CNA') {
-    // CNA uses different HTML structure
-    const cnaPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>[\s\S]{0,100}?<h[2-4][^>]*>([^<]+)<\/h[2-4]>/gi;
-    let match;
-    
-    while ((match = cnaPattern.exec(html)) !== null) {
-      let url = match[1];
-      let title = match[2].trim();
-      
-      if (url.startsWith('/')) {
-        url = site.baseUrl + url;
-      }
-      
-      if (title.length > 15 && !articles.find(a => a.url === url)) {
-        articles.push({ title, url });
-      }
-    }
-  }
-  
-  // Generic fallback pattern - any link with substantial text
-  const genericPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]{20,}?)<\/a>/gi;
+  // Look for article links - try multiple patterns
+  // Pattern 1: href with article-like URLs
+  const urlPattern = /href=["']([^"']*\/(food|dining|singapore|life)[^"']*?)["']/gi;
   let match;
+  const foundUrls = new Set();
   
-  while ((match = genericPattern.exec(html)) !== null) {
+  while ((match = urlPattern.exec(html)) !== null) {
     let url = match[1];
-    let title = match[2].trim();
     
-    // Make URL absolute
+    // Make absolute
     if (url.startsWith('/')) {
       url = site.baseUrl + url;
     }
     
-    // Only include URLs that look like articles
-    if (url.includes(site.baseUrl) && 
-        !url.includes('#') && 
-        !url.includes('javascript:') &&
-        !url.includes('/search') &&
-        !url.includes('/tag/') &&
-        title.length > 20 &&
-        !articles.find(a => a.url === url)) {
+    // Skip non-article URLs
+    if (url.includes('/search') || url.includes('/tag') || url.includes('#')) continue;
+    
+    // Only process each URL once
+    if (foundUrls.has(url)) continue;
+    foundUrls.add(url);
+    
+    // Try to find the title near this URL in the HTML
+    const urlIndex = html.indexOf(match[0]);
+    const contextStart = Math.max(0, urlIndex - 500);
+    const contextEnd = Math.min(html.length, urlIndex + 500);
+    const context = html.substring(contextStart, contextEnd);
+    
+    // Look for title in context
+    const titlePattern = />([^<]{20,150}?)</gi;
+    let titleMatch;
+    while ((titleMatch = titlePattern.exec(context)) !== null) {
+      const title = titleMatch[1].trim().replace(/&amp;/g, '&').replace(/&quot;/g, '"');
+      
+      // Skip if looks like navigation or metadata
+      if (title.length < 20 || title.includes('http') || title.match(/^\d+$/)) continue;
+      
       articles.push({ title, url });
+      break; // Found a title for this URL
     }
   }
   
-  Logger.log(`Extracted ${articles.length} articles using patterns`);
   return articles;
 }
+
 
 /**
  * Clean up common XML issues that cause parsing errors
@@ -1155,6 +1063,92 @@ function checkDuplicateCandidate(candidatesSheet, businessName) {
   }
   
   return false;
+}
+
+/**
+ * Manually add articles from ST/CNA that can't be scraped automatically
+ * Usage: Edit the MANUAL_ARTICLES array below and run this function
+ */
+function addManualArticles() {
+  const MANUAL_ARTICLES = [
+    {
+      title: 'French eatery SO France to close Singapore outlets by February',
+      url: 'https://www.straitstimes.com/life/food/french-eatery-so-france-to-close-singapore-outlets-by-february',
+      publisher: 'The Straits Times'
+    },
+    {
+      title: 'The Halia restaurant at Singapore Botanic Gardens to shut in mid-March after 25 years',
+      url: 'https://www.straitstimes.com/life/food/the-halia-restaurant-at-singapore-botanic-gardens-to-shut-in-mid-march-after-25-years',
+      publisher: 'The Straits Times'
+    }
+    // Add more articles here as you find them
+  ];
+  
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.CANDIDATES);
+  const scriptProps = PropertiesService.getScriptProperties();
+  let nextCandidateId = parseInt(scriptProps.getProperty('NEXT_CANDIDATE_ID') || '1');
+  
+  // Build existing URLs index
+  const existingUrls = new Set();
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    const urlCol = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
+    urlCol.forEach(row => {
+      if (row[0]) existingUrls.add(row[0].toString().trim());
+    });
+  }
+  
+  let added = 0;
+  
+  MANUAL_ARTICLES.forEach(article => {
+    if (existingUrls.has(article.url)) {
+      Logger.log(`Skipping duplicate: ${article.title}`);
+      return;
+    }
+    
+    // Use AI to analyze
+    const analysis = analyzeHeadlineWithAI(article.title, article.url, article.publisher);
+    
+    if (analysis.isClosure && analysis.confidence >= 0.6) {
+      const areaGuess = extractArea(article.title);
+      const isDuplicate = checkDuplicateCandidate(sheet, analysis.businessName);
+      
+      const candidateId = `CAND-${String(nextCandidateId).padStart(5, '0')}`;
+      const row = [
+        candidateId,
+        new Date(),
+        article.publisher,
+        article.title,
+        article.url,
+        '',
+        'manual',
+        analysis.businessName,
+        areaGuess,
+        analysis.confidence,
+        analysis.reason,
+        isDuplicate ? 'duplicate' : 'new',
+        ''
+      ];
+      
+      sheet.appendRow(row);
+      added++;
+      nextCandidateId++;
+      existingUrls.add(article.url);
+      
+      Logger.log(`✅ Added: ${analysis.businessName}`);
+      Utilities.sleep(500);
+    } else {
+      Logger.log(`❌ Rejected: ${article.title} - ${analysis.reason}`);
+    }
+  });
+  
+  scriptProps.setProperty('NEXT_CANDIDATE_ID', nextCandidateId.toString());
+  Logger.log(`Manual import complete. Added ${added} articles.`);
+  
+  if (added > 0) {
+    sendTelegram(`📝 Manually added ${added} article(s) to candidates.`);
+  }
 }
 
 /**
