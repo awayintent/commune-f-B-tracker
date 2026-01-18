@@ -435,16 +435,28 @@ function addReviewColumns() {
 
 /**
  * RSS feed sources for Singapore F&B news
- * Note: Only using verified working RSS feeds
  */
 const RSS_FEEDS = [
   // Food blogs (WordPress feeds are reliable)
   'https://sethlui.com/feed/',
   'https://danielfooddiary.com/feed/',
   'https://www.eatbook.sg/feed/',
-  
-  // Note: Straits Times and Mothership don't have working RSS feeds
-  // We'll need to scrape their sites directly or use their APIs
+];
+
+/**
+ * News sites to scrape directly (non-RSS)
+ */
+const SCRAPE_SITES = [
+  {
+    name: 'The Straits Times',
+    url: 'https://www.straitstimes.com/',
+    type: 'html'
+  },
+  {
+    name: 'CNA',
+    url: 'https://channelnewsasia.com/',
+    type: 'html'
+  }
 ];
 
 /**
@@ -590,7 +602,7 @@ function initializeCandidatesSheet() {
 }
 
 /**
- * Fetch RSS feeds and identify closure-related headlines
+ * Fetch RSS feeds and scrape news sites to identify closure-related headlines
  * This should be run on a time-driven trigger (every 6-12 hours)
  */
 function fetchCandidates() {
@@ -615,6 +627,29 @@ function fetchCandidates() {
   let newCandidates = 0;
   const scriptProps = PropertiesService.getScriptProperties();
   let nextCandidateId = parseInt(scriptProps.getProperty('NEXT_CANDIDATE_ID') || '1');
+  
+  // Process RSS feeds
+  newCandidates += processRSSFeeds(sheet, existingUrls, nextCandidateId);
+  
+  // Process HTML scraping sites
+  newCandidates += processScrapeSites(sheet, existingUrls, nextCandidateId);
+  
+  // Save next candidate ID
+  scriptProps.setProperty('NEXT_CANDIDATE_ID', nextCandidateId.toString());
+  
+  Logger.log(`Fetch complete. Found ${newCandidates} new candidates.`);
+  
+  // Send Telegram notification if new candidates found
+  if (newCandidates > 0) {
+    sendTelegram(`🔍 Found ${newCandidates} new closure candidate(s) from RSS feeds. Review in CANDIDATES sheet.`);
+  }
+}
+
+/**
+ * Process RSS feeds
+ */
+function processRSSFeeds(sheet, existingUrls, nextCandidateId) {
+  let newCandidates = 0;
   
   // Fetch each RSS feed
   RSS_FEEDS.forEach(feedUrl => {
@@ -724,6 +759,152 @@ function fetchCandidates() {
   if (newCandidates > 0) {
     sendTelegram(`🔍 Found ${newCandidates} new closure candidate(s) from RSS feeds. Review in CANDIDATES sheet.`);
   }
+}
+
+/**
+ * Process HTML scraping sites (Straits Times, CNA)
+ */
+function processScrapeSites(sheet, existingUrls, nextCandidateId) {
+  let newCandidates = 0;
+  const scriptProps = PropertiesService.getScriptProperties();
+  
+  SCRAPE_SITES.forEach(site => {
+    try {
+      Logger.log(`Scraping ${site.name} from ${site.url}`);
+      
+      const response = UrlFetchApp.fetch(site.url, {
+        muteHttpExceptions: true,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; CommuneBot/1.0)'
+        }
+      });
+      
+      if (response.getResponseCode() !== 200) {
+        Logger.log(`Failed to fetch ${site.url}: ${response.getResponseCode()}`);
+        return;
+      }
+      
+      const html = response.getContentText();
+      
+      // Extract article headlines and URLs using regex
+      // This is a simple approach - looks for links with text
+      const articles = extractArticlesFromHTML(html, site.url);
+      
+      Logger.log(`Found ${articles.length} articles from ${site.name}`);
+      
+      articles.forEach(article => {
+        try {
+          const headline = article.title;
+          const url = article.url;
+          
+          if (!headline || !url || existingUrls.has(url)) {
+            return;
+          }
+          
+          // Check if headline matches closure keywords
+          const matchedTerms = findMatchedKeywords(headline);
+          
+          if (matchedTerms.length > 0) {
+            // Use AI to analyze if this is actually a closure
+            const analysis = analyzeHeadlineWithAI(headline, url, site.name);
+            
+            // Only add if AI confirms it's likely a closure (confidence >= 0.6)
+            if (analysis.isClosure && analysis.confidence >= 0.6) {
+              const areaGuess = extractArea(headline);
+              
+              // Check for duplicates by business name
+              const isDuplicate = checkDuplicateCandidate(sheet, analysis.businessName);
+              
+              // Add to candidates sheet
+              const candidateId = `CAND-${String(nextCandidateId).padStart(5, '0')}`;
+              const row = [
+                candidateId,
+                new Date(),
+                site.name,
+                headline,
+                url,
+                '',
+                matchedTerms.join(', '),
+                analysis.businessName,
+                areaGuess,
+                analysis.confidence,
+                analysis.reason,
+                isDuplicate ? 'duplicate' : 'new',
+                ''
+              ];
+              
+              sheet.appendRow(row);
+              newCandidates++;
+              nextCandidateId++;
+              existingUrls.add(url);
+              
+              // Small delay to avoid rate limiting
+              Utilities.sleep(500);
+            } else {
+              Logger.log(`Rejected: "${headline}" - ${analysis.reason}`);
+            }
+          }
+        } catch (articleError) {
+          Logger.log(`Error processing article: ${articleError}`);
+        }
+      });
+      
+    } catch (siteError) {
+      Logger.log(`Error scraping ${site.name}: ${siteError}`);
+    }
+  });
+  
+  // Update next candidate ID
+  scriptProps.setProperty('NEXT_CANDIDATE_ID', nextCandidateId.toString());
+  
+  return newCandidates;
+}
+
+/**
+ * Extract articles from HTML content
+ * Returns array of {title, url} objects
+ */
+function extractArticlesFromHTML(html, baseUrl) {
+  const articles = [];
+  
+  // Remove script and style tags
+  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  
+  // Extract links with text - looking for article patterns
+  // Pattern: <a href="URL">TITLE</a>
+  const linkPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi;
+  let match;
+  
+  while ((match = linkPattern.exec(html)) !== null) {
+    let url = match[1];
+    const title = match[2].trim();
+    
+    // Skip empty titles or navigation links
+    if (!title || title.length < 10) continue;
+    
+    // Make URL absolute if it's relative
+    if (url.startsWith('/')) {
+      const domain = baseUrl.match(/^https?:\/\/[^\/]+/)[0];
+      url = domain + url;
+    }
+    
+    // Only include URLs that look like articles (not navigation, etc)
+    if (url.includes(baseUrl) && 
+        !url.includes('#') && 
+        !url.includes('javascript:') &&
+        title.length > 15) {
+      articles.push({ title, url });
+    }
+  }
+  
+  // Remove duplicates
+  const seen = new Set();
+  return articles.filter(article => {
+    if (seen.has(article.url)) return false;
+    seen.add(article.url);
+    return true;
+  });
 }
 
 /**
