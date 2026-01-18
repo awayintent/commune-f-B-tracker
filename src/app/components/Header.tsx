@@ -1,4 +1,3 @@
-import communeLogo from 'figma:asset/5e18ce48629e7cc4be8c2b9f12f2af1a415d4d1a.png';
 import { Button } from '@/app/components/ui/button';
 import { Mail } from 'lucide-react';
 import { config } from '@/app/config/env';
@@ -23,7 +22,7 @@ export function Header() {
             </h1>
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-300">by</span>
-              <img src={communeLogo} alt="Commune" className="h-6" />
+              <span className="text-white font-bold">COMMUNE</span>
             </div>
           </a>
           
