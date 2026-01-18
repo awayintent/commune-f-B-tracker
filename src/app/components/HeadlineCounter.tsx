@@ -95,7 +95,7 @@ export function HeadlineCounter() {
     }, 30);
 
     return () => clearInterval(timer);
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, counterData]);
 
   const getPeriodText = () => {
     if (selectedMonth) {
