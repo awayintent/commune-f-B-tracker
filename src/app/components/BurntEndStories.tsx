@@ -1,39 +1,57 @@
+import { useState, useEffect } from 'react';
 import { ExternalLink, BookOpen } from 'lucide-react';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 
-// TODO: Replace with actual API/RSS feed from commune-asia.com
-const FEATURED_STORIES = [
-  {
-    id: 1,
-    title: 'The Rise and Fall of Paradise Dynasty',
-    excerpt: 'An in-depth analysis of how one of Singapore\'s most beloved dim sum chains lost its way in a competitive market.',
-    url: 'https://commune-asia.com/burnt-end/paradise-dynasty',
-    imageUrl: 'https://images.unsplash.com/photo-1496412705862-e0088f16f791?w=400&h=250&fit=crop',
-    date: 'Mar 15, 2026',
-    readTime: '12 min read'
-  },
-  {
-    id: 2,
-    title: 'When Expansion Kills: The Hawker Chain Story',
-    excerpt: 'How rapid expansion and loss of quality control led to the downfall of a once-promising hawker franchise.',
-    url: 'https://commune-asia.com/burnt-end/hawker-chain',
-    imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=250&fit=crop',
-    date: 'Feb 28, 2026',
-    readTime: '10 min read'
-  },
-  {
-    id: 3,
-    title: 'The $2M Mistake: A Michelin-Starred Closure',
-    excerpt: 'Inside the financial decisions that brought down a Michelin-starred restaurant in just 18 months.',
-    url: 'https://commune-asia.com/burnt-end/michelin-mistake',
-    imageUrl: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=400&h=250&fit=crop',
-    date: 'Jan 20, 2026',
-    readTime: '15 min read'
-  }
-];
+interface Story {
+  id: number;
+  title: string;
+  excerpt: string;
+  url: string;
+  imageUrl: string;
+  date: string;
+  readTime: string;
+}
 
 export function BurntEndStories() {
+  const [stories, setStories] = useState<Story[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // TODO: Replace this with actual RSS feed or API from commune-asia.com
+    // For now, we'll hide the section until you provide the RSS feed URL
+    // You can add: VITE_BURNT_END_RSS_URL to your environment variables
+    
+    const rssUrl = import.meta.env.VITE_BURNT_END_RSS_URL;
+    
+    if (!rssUrl) {
+      console.log('VITE_BURNT_END_RSS_URL not configured - Burnt End Stories section hidden');
+      setLoading(false);
+      return;
+    }
+
+    // Fetch RSS feed when available
+    async function fetchStories() {
+      try {
+        // This will be implemented once you provide the RSS feed URL
+        // For now, return empty array
+        setStories([]);
+      } catch (error) {
+        console.error('Error fetching Burnt End stories:', error);
+        setStories([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStories();
+  }, []);
+
+  // Don't render section if no stories or still loading
+  if (loading || stories.length === 0) {
+    return null;
+  }
+
   return (
     <section className="py-16 bg-gradient-to-br from-gray-50 to-white">
       <div className="container mx-auto px-4">
@@ -53,7 +71,7 @@ export function BurntEndStories() {
 
         {/* Stories Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {FEATURED_STORIES.map((story) => (
+          {stories.map((story) => (
             <Card 
               key={story.id} 
               className="hover:shadow-xl transition-all duration-300 overflow-hidden group border-gray-200"

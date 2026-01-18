@@ -26,11 +26,6 @@ export default function App() {
               <RecentClosures />
             </div>
 
-            {/* Burnt End Stories - Full width section */}
-            <div className="-mx-4">
-              <BurntEndStories />
-            </div>
-
             {/* Main Table */}
             <div className="px-4 md:px-0">
               <MainTable />
@@ -39,6 +34,11 @@ export default function App() {
             {/* Submission CTA */}
             <div className="px-4 md:px-0">
               <SubmissionCTA />
+            </div>
+
+            {/* Burnt End Stories - Full width section */}
+            <div className="-mx-4">
+              <BurntEndStories />
             </div>
 
             {/* Events and Articles */}
