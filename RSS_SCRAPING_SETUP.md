@@ -1,18 +1,47 @@
 # RSS Scraping Setup Guide
 
-This document explains how to set up and use the automated RSS scraping feature for discovering F&B closure news.
+This document explains how to set up and use the AI-powered automated RSS scraping feature for discovering F&B closure news.
 
 ## Overview
 
 The system automatically:
 1. **Fetches RSS feeds** from Singapore F&B news sources every 6-12 hours
-2. **Identifies closure-related headlines** using keyword matching
-3. **Saves candidates** to the `Candidates` sheet for review
-4. **Converts approved candidates** to draft submissions in the `Submissions` sheet
+2. **Uses AI (OpenAI GPT)** to semantically analyze headlines and determine if they're about actual closures
+3. **Extracts business names** accurately using AI
+4. **Detects duplicates** across candidates and existing closures
+5. **Saves high-quality candidates** to the `Candidates` sheet with confidence scores
+6. **Converts approved candidates** to draft submissions in the `Submissions` sheet
+
+## Why AI-Powered?
+
+Simple keyword matching fails because:
+- ❌ "Restaurant closes at 10pm" → Not a closure
+- ❌ "Close to perfection" → Not a closure
+- ❌ "New opening closes gap in market" → Not a closure
+
+AI semantic analysis correctly identifies:
+- ✅ "Paradise Dynasty bids farewell after 10 years"
+- ✅ "Tim Ho Wan shutters last Singapore outlet"
+- ✅ "Iconic Orchard restaurant to cease operations"
 
 ## Setup Steps
 
-### 1. Initialize the Candidates Sheet
+### 1. Get an OpenAI API Key
+
+1. Go to [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Create an account or sign in
+3. Click **"Create new secret key"**
+4. Copy the API key (starts with `sk-...`)
+5. In Google Apps Script, go to **Project Settings** (gear icon)
+6. Scroll to **Script Properties**
+7. Click **"Add script property"**
+   - Property: `OPENAI_API_KEY`
+   - Value: `sk-your-api-key-here`
+8. Click **Save**
+
+**Cost estimate**: Using GPT-4o-mini, analyzing ~100 headlines costs less than $0.10
+
+### 2. Initialize the Candidates Sheet
 
 In Google Apps Script:
 
@@ -21,7 +50,7 @@ In Google Apps Script:
 3. Find the function `initializeCandidatesSheet()`
 4. Click **Run** (you may need to authorize the script)
 
-This creates a new sheet called `Candidates` with the proper column headers.
+This creates a new sheet called `Candidates` with the proper column headers including AI analysis fields.
 
 ### 2. Set Up Time-Driven Triggers
 
@@ -138,18 +167,23 @@ const CLOSURE_KEYWORDS = [
 | `headline` | Original headline text |
 | `url` | Article URL |
 | `published_at` | When the article was published |
-| `matched_terms` | Which closure keywords were found |
-| `entity_guess` | Script's guess at business name |
+| `matched_terms` | Which closure keywords triggered initial filter |
+| `business_name` | **AI-extracted** business name |
 | `area_guess` | Script's guess at location |
-| `status` | `new` → `queued` → `promoted` or `rejected` |
+| `confidence_score` | **AI confidence** (0.0-1.0, only ≥0.6 saved) |
+| `ai_reason` | **AI explanation** of why this is/isn't a closure |
+| `status` | `new`, `duplicate`, `queued`, `promoted`, or `rejected` |
 | `review_notes` | Your notes during review |
 
 ## Status Values
 
-- **`new`** - Just discovered, needs admin review
+- **`new`** - Just discovered, AI confirmed as closure (confidence ≥0.6), needs admin review
+- **`duplicate`** - Business name already exists in candidates or closures
 - **`queued`** - Admin approved, ready to convert to submission
 - **`promoted`** - Converted to a draft submission
 - **`rejected`** - Not relevant, ignored
+
+**Note**: Items with confidence ≥0.9 can be auto-promoted to submissions without manual queuing.
 
 ## Tips for Effective Use
 

@@ -22,6 +22,7 @@
  * Script Properties (Project Settings > Script Properties):
  * - TELEGRAM_BOT_TOKEN: Your Telegram bot token (optional)
  * - TELEGRAM_CHAT_ID: Your Telegram chat ID (optional)
+ * - OPENAI_API_KEY: Your OpenAI API key for semantic analysis (required for RSS scraping)
  */
 
 const SHEET_NAMES = {
@@ -451,13 +452,104 @@ const RSS_FEEDS = [
 ];
 
 /**
- * Keywords that indicate potential closures
+ * Keywords for initial filtering (broad match to reduce API calls)
+ * We'll use semantic analysis for actual validation
  */
 const CLOSURE_KEYWORDS = [
   'close', 'closes', 'closed', 'closing', 'shut', 'shutting', 'shutter',
   'cease', 'ceases', 'ceased', 'ceasing', 'farewell', 'final day',
-  'last day', 'goodbye', 'end of', 'no more', 'permanently'
+  'last day', 'goodbye', 'end of', 'no more', 'permanently', 'shuttered',
+  'bidding farewell', 'saying goodbye', 'last service', 'final', 'ending'
 ];
+
+/**
+ * Semantic analysis using OpenAI GPT to determine if headline is about F&B closure
+ * Returns: { isClosure: boolean, businessName: string, confidence: number, reason: string }
+ */
+function analyzeHeadlineWithAI(headline, url, publisher) {
+  const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+  
+  if (!apiKey) {
+    Logger.log('OPENAI_API_KEY not set. Falling back to keyword matching.');
+    return {
+      isClosure: true, // Assume true if no API key (conservative)
+      businessName: extractBusinessName(headline),
+      confidence: 0.5,
+      reason: 'No AI analysis (API key missing)'
+    };
+  }
+  
+  const prompt = `You are analyzing Singapore F&B news headlines to identify actual business closures.
+
+Headline: "${headline}"
+Source: ${publisher}
+
+Analyze this headline and respond in JSON format:
+{
+  "isClosure": true/false,
+  "businessName": "extracted business name or empty string",
+  "confidence": 0.0-1.0,
+  "reason": "brief explanation"
+}
+
+Rules:
+- isClosure should be TRUE only if the headline is about a restaurant, cafe, bar, or F&B business that is PERMANENTLY closing or has closed
+- isClosure should be FALSE for: temporary closures, renovations, new openings, menu changes, reviews, events, or unrelated news
+- businessName should be the specific business name (e.g., "Paradise Dynasty", "Tim Ho Wan"), not generic terms
+- confidence: 1.0 = definitely a closure, 0.5 = uncertain, 0.0 = definitely not a closure
+- reason: explain why this is or isn't a closure
+
+Respond ONLY with valid JSON, no other text.`;
+
+  try {
+    const response = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'post',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      payload: JSON.stringify({
+        model: 'gpt-4o-mini', // Fast and cheap model
+        messages: [
+          { role: 'system', content: 'You are a precise F&B industry analyst. Respond only with valid JSON.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3, // Low temperature for consistent results
+        max_tokens: 200
+      }),
+      muteHttpExceptions: true
+    });
+    
+    const result = JSON.parse(response.getContentText());
+    
+    if (result.error) {
+      Logger.log(`OpenAI API error: ${result.error.message}`);
+      return fallbackAnalysis(headline);
+    }
+    
+    const content = result.choices[0].message.content.trim();
+    const analysis = JSON.parse(content);
+    
+    Logger.log(`AI Analysis for "${headline}": ${JSON.stringify(analysis)}`);
+    return analysis;
+    
+  } catch (error) {
+    Logger.log(`Error calling OpenAI API: ${error}`);
+    return fallbackAnalysis(headline);
+  }
+}
+
+/**
+ * Fallback analysis when AI is unavailable
+ */
+function fallbackAnalysis(headline) {
+  return {
+    isClosure: true,
+    businessName: extractBusinessName(headline),
+    confidence: 0.5,
+    reason: 'Fallback keyword matching (AI unavailable)'
+  };
+}
 
 /**
  * Initialize Candidates sheet with headers
@@ -479,14 +571,21 @@ function initializeCandidatesSheet() {
     'url',
     'published_at',
     'matched_terms',
-    'entity_guess',
+    'business_name',
     'area_guess',
+    'confidence_score',
+    'ai_reason',
     'status',
     'review_notes'
   ];
   
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  
+  // Set column widths for readability
+  sheet.setColumnWidth(4, 300); // headline
+  sheet.setColumnWidth(5, 200); // url
+  sheet.setColumnWidth(11, 250); // ai_reason
   
   Logger.log('Candidates sheet initialized');
 }
@@ -564,34 +663,48 @@ function fetchCandidates() {
             return;
           }
           
-          // Check if headline matches closure keywords
+          // Check if headline matches closure keywords (initial filter)
           const matchedTerms = findMatchedKeywords(headline);
           
           if (matchedTerms.length > 0) {
-            // Extract potential business name and area from headline
-            const entityGuess = extractBusinessName(headline);
-            const areaGuess = extractArea(headline);
+            // Use AI to analyze if this is actually a closure
+            const analysis = analyzeHeadlineWithAI(headline, url, publisher);
             
-            // Add to candidates sheet
-            const candidateId = `CAND-${String(nextCandidateId).padStart(5, '0')}`;
-            const row = [
-              candidateId,
-              new Date(),
-              publisher,
-              headline,
-              url,
-              pubDate || '',
-              matchedTerms.join(', '),
-              entityGuess,
-              areaGuess,
-              'new',
-              ''
-            ];
-            
-            sheet.appendRow(row);
-            newCandidates++;
-            nextCandidateId++;
-            existingUrls.add(url);
+            // Only add if AI confirms it's likely a closure (confidence > 0.6)
+            if (analysis.isClosure && analysis.confidence >= 0.6) {
+              const areaGuess = extractArea(headline);
+              
+              // Check for duplicates by business name
+              const isDuplicate = checkDuplicateCandidate(sheet, analysis.businessName);
+              
+              // Add to candidates sheet
+              const candidateId = `CAND-${String(nextCandidateId).padStart(5, '0')}`;
+              const row = [
+                candidateId,
+                new Date(),
+                publisher,
+                headline,
+                url,
+                pubDate || '',
+                matchedTerms.join(', '),
+                analysis.businessName,
+                areaGuess,
+                analysis.confidence,
+                analysis.reason,
+                isDuplicate ? 'duplicate' : 'new',
+                ''
+              ];
+              
+              sheet.appendRow(row);
+              newCandidates++;
+              nextCandidateId++;
+              existingUrls.add(url);
+              
+              // Small delay to avoid rate limiting
+              Utilities.sleep(500);
+            } else {
+              Logger.log(`Rejected: "${headline}" - ${analysis.reason}`);
+            }
           }
         } catch (itemError) {
           Logger.log(`Error processing item: ${itemError}`);
@@ -712,6 +825,50 @@ function extractArea(headline) {
 }
 
 /**
+ * Check if a business name already exists in candidates or closures
+ * Returns true if duplicate found
+ */
+function checkDuplicateCandidate(candidatesSheet, businessName) {
+  if (!businessName || businessName.trim() === '') {
+    return false;
+  }
+  
+  const normalizedName = normalize(businessName);
+  
+  // Check in candidates sheet
+  const lastRow = candidatesSheet.getLastRow();
+  if (lastRow > 1) {
+    const businessNames = candidatesSheet.getRange(2, 8, lastRow - 1, 1).getValues();
+    for (let i = 0; i < businessNames.length; i++) {
+      const existingName = businessNames[i][0];
+      if (existingName && normalize(existingName) === normalizedName) {
+        Logger.log(`Duplicate found in candidates: ${businessName} matches ${existingName}`);
+        return true;
+      }
+    }
+  }
+  
+  // Check in closures sheet
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const closuresSheet = ss.getSheetByName(SHEET_NAMES.CLOSURES);
+  if (closuresSheet) {
+    const closuresLastRow = closuresSheet.getLastRow();
+    if (closuresLastRow > 1) {
+      const closureNames = closuresSheet.getRange(2, 3, closuresLastRow - 1, 1).getValues();
+      for (let i = 0; i < closureNames.length; i++) {
+        const existingName = closureNames[i][0];
+        if (existingName && normalize(existingName) === normalizedName) {
+          Logger.log(`Duplicate found in closures: ${businessName} matches ${existingName}`);
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Convert selected candidates to draft submissions
  * Admin should first review candidates and mark promising ones as 'queued'
  * This function converts 'queued' candidates to submissions
@@ -729,7 +886,7 @@ function draftSubmissionsFromCandidates() {
   const data = candidatesSheet.getDataRange().getValues();
   let drafted = 0;
   
-  // Process each candidate with status 'queued'
+  // Process each candidate with status 'queued' or 'new' (for high-confidence ones)
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const candidateId = row[0];
@@ -739,21 +896,24 @@ function draftSubmissionsFromCandidates() {
     const url = row[4];
     const publishedAt = row[5];
     const matchedTerms = row[6];
-    const entityGuess = row[7];
+    const businessName = row[7];
     const areaGuess = row[8];
-    const status = row[9];
+    const confidenceScore = row[9];
+    const aiReason = row[10];
+    const status = row[11];
     
-    if (status === 'queued') {
+    // Only process queued items (admin-approved) or high-confidence new items
+    if (status === 'queued' || (status === 'new' && confidenceScore >= 0.9)) {
       // Create a draft submission
       const submissionRow = [
         new Date(), // Timestamp
-        entityGuess || headline, // Business Name
+        businessName || headline, // Business Name
         '', // Outlet/Branch Name
         '', // Business address
         '', // Last Day of Operation
         `Closure reported by ${publisher}`, // Reason for Closure
         url, // Source URL
-        `Headline: ${headline}\nMatched terms: ${matchedTerms}`, // Additional Notes
+        `Headline: ${headline}\nAI Analysis: ${aiReason}\nMatched terms: ${matchedTerms}`, // Additional Notes
         'System (RSS)', // Submitter Name
         publisher // Submitter Contact
       ];
@@ -761,7 +921,7 @@ function draftSubmissionsFromCandidates() {
       submissionsSheet.appendRow(submissionRow);
       
       // Update candidate status to 'promoted'
-      candidatesSheet.getRange(i + 1, 10).setValue('promoted');
+      candidatesSheet.getRange(i + 1, 12).setValue('promoted');
       
       drafted++;
     }
