@@ -750,15 +750,7 @@ function processRSSFeeds(sheet, existingUrls, nextCandidateId) {
     }
   });
   
-  // Save next candidate ID
-  scriptProps.setProperty('NEXT_CANDIDATE_ID', nextCandidateId.toString());
-  
-  Logger.log(`Fetch complete. Found ${newCandidates} new candidates.`);
-  
-  // Send Telegram notification if new candidates found
-  if (newCandidates > 0) {
-    sendTelegram(`🔍 Found ${newCandidates} new closure candidate(s) from RSS feeds. Review in CANDIDATES sheet.`);
-  }
+  return newCandidates;
 }
 
 /**
