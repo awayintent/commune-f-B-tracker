@@ -403,6 +403,52 @@ function initializeProperties() {
 }
 
 /**
+ * Assign closure IDs to any rows in Closures sheet that are missing them
+ * Useful for retroactive manual additions
+ * 
+ * Usage:
+ * 1. Add your closure data to the Closures sheet, leave closure_id column empty
+ * 2. Run this function from Apps Script editor
+ * 3. It will automatically assign sequential IDs to all rows missing them
+ */
+function assignMissingClosureIds() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.CLOSURES);
+  
+  if (!sheet) {
+    Logger.log('Closures sheet not found');
+    return;
+  }
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    Logger.log('No data rows found');
+    return;
+  }
+  
+  const data = sheet.getRange(2, 1, lastRow - 1, 1).getValues(); // Get closure_id column
+  let assigned = 0;
+  
+  for (let i = 0; i < data.length; i++) {
+    const closureId = data[i][0];
+    
+    // If closure_id is empty, assign one
+    if (!closureId || closureId.toString().trim() === '') {
+      const newId = getNextClosureId();
+      sheet.getRange(i + 2, 1).setValue(newId); // +2 because: +1 for header, +1 for 0-indexed array
+      Logger.log(`Assigned ${newId} to row ${i + 2}`);
+      assigned++;
+    }
+  }
+  
+  Logger.log(`Assigned ${assigned} closure IDs`);
+  
+  if (assigned > 0) {
+    sendTelegram(`🔢 Assigned ${assigned} closure ID(s) to manually added entries.`);
+  }
+}
+
+/**
  * Add review column headers to Submissions sheet
  * Run this once after creating your form
  */
