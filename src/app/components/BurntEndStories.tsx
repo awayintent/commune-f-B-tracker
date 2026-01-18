@@ -4,13 +4,11 @@ import { Card, CardContent } from '@/app/components/ui/card';
 import { Button } from '@/app/components/ui/button';
 
 interface Story {
-  id: number;
   title: string;
   excerpt: string;
   url: string;
   imageUrl: string;
   date: string;
-  readTime: string;
 }
 
 export function BurntEndStories() {
@@ -18,24 +16,56 @@ export function BurntEndStories() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Replace this with actual RSS feed or API from commune-asia.com
-    // For now, we'll hide the section until you provide the RSS feed URL
-    // You can add: VITE_BURNT_END_RSS_URL to your environment variables
-    
-    const rssUrl = import.meta.env.VITE_BURNT_END_RSS_URL;
-    
-    if (!rssUrl) {
-      console.log('VITE_BURNT_END_RSS_URL not configured - Burnt End Stories section hidden');
-      setLoading(false);
-      return;
-    }
-
-    // Fetch RSS feed when available
     async function fetchStories() {
       try {
-        // This will be implemented once you provide the RSS feed URL
-        // For now, return empty array
-        setStories([]);
+        // Use RSS2JSON service to convert RSS to JSON (avoids CORS issues)
+        const rssUrl = 'https://www.commune-asia.com/feed';
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=20`;
+        
+        const response = await fetch(apiUrl);
+        if (!response.ok) {
+          throw new Error('Failed to fetch RSS feed');
+        }
+        
+        const data = await response.json();
+        
+        // Filter for Burnt End stories only (title starts with "Burnt Ends:")
+        const burntEndStories = data.items
+          .filter((item: any) => item.title.startsWith('Burnt Ends:'))
+          .slice(0, 3) // Get only the 3 most recent
+          .map((item: any) => {
+            // Extract image from enclosure or content
+            let imageUrl = item.enclosure?.link || item.thumbnail || '';
+            
+            // If no image found, try to extract from content
+            if (!imageUrl && item.content) {
+              const imgMatch = item.content.match(/<img[^>]+src="([^">]+)"/);
+              if (imgMatch) {
+                imageUrl = imgMatch[1];
+              }
+            }
+            
+            // Clean up the title (remove "Burnt Ends: " prefix)
+            const cleanTitle = item.title.replace(/^Burnt Ends:\s*/i, '');
+            
+            // Format date
+            const date = new Date(item.pubDate);
+            const formattedDate = date.toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            });
+            
+            return {
+              title: cleanTitle,
+              excerpt: item.description || '',
+              url: item.link,
+              imageUrl: imageUrl,
+              date: formattedDate
+            };
+          });
+        
+        setStories(burntEndStories);
       } catch (error) {
         console.error('Error fetching Burnt End stories:', error);
         setStories([]);
@@ -73,23 +103,31 @@ export function BurntEndStories() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {stories.map((story) => (
             <Card 
-              key={story.id} 
+              key={story.url} 
               className="hover:shadow-xl transition-all duration-300 overflow-hidden group border-gray-200"
             >
-              {/* Image */}
+              {/* Image with 40% opacity overlay */}
               <div className="relative h-48 overflow-hidden bg-gray-200">
-                <img
-                  src={story.imageUrl}
-                  alt={story.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                <div className="absolute bottom-3 left-3 right-3">
-                  <span className="text-xs text-white/90 font-medium">
-                    {story.date} • {story.readTime}
-                  </span>
-                </div>
-              </div>
+                {story.imageUrl ? (
+                  <>
+                    <img
+                      src={story.imageUrl}
+                      alt={story.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {/* 40% opacity dark overlay */}
+                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute bottom-3 left-3 right-3 z-10">
+                      <span className="text-xs text-white font-medium drop-shadow-lg">
+                        {story.date}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#0b3860] to-[#072a47]">
+                    <BookOpen className="w-12 h-12 text-white/50" />
+                  </div>
+                )}
 
               {/* Content */}
               <CardContent className="p-5">
