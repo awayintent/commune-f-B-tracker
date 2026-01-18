@@ -20,6 +20,9 @@ export function Footer() {
             <h3 className="text-lg font-bold text-[#0b3860] mb-3">
               Singapore F&B Closures Tracker
             </h3>
+            <p className="text-sm text-gray-600 mb-4 max-w-md">
+              A comprehensive database tracking F&B business closures in Singapore.
+            </p>
             <Button 
               onClick={handleSubscribe}
               className="bg-[#f5903e] hover:bg-[#e07d2a] text-white font-semibold"

@@ -29,9 +29,17 @@ export function BurntEndStories() {
         
         const data = await response.json();
         
-        // Filter for Burnt End stories only (title starts with "Burnt Ends:")
+        console.log('RSS feed data:', data);
+        console.log('Total items:', data.items?.length);
+        
+        // Filter for Burnt End stories only (title contains "Burnt End" - case insensitive)
         const burntEndStories = data.items
-          .filter((item: any) => item.title.startsWith('Burnt Ends:'))
+          .filter((item: any) => {
+            const title = item.title || '';
+            const isBurntEnd = title.toLowerCase().includes('burnt end');
+            console.log(`Article: "${title}" - Is Burnt End: ${isBurntEnd}`);
+            return isBurntEnd;
+          })
           .slice(0, 3) // Get only the 3 most recent
           .map((item: any) => {
             // Extract image from enclosure or content
@@ -45,8 +53,8 @@ export function BurntEndStories() {
               }
             }
             
-            // Clean up the title (remove "Burnt Ends: " prefix)
-            const cleanTitle = item.title.replace(/^Burnt Ends:\s*/i, '');
+            // Clean up the title (remove "Burnt Ends:" or "Burnt End:" prefix)
+            const cleanTitle = item.title.replace(/^Burnt Ends?:\s*/i, '');
             
             // Format date
             const date = new Date(item.pubDate);
@@ -65,6 +73,9 @@ export function BurntEndStories() {
             };
           });
         
+        console.log('Burnt End stories found:', burntEndStories.length);
+        console.log('Stories:', burntEndStories);
+        
         setStories(burntEndStories);
       } catch (error) {
         console.error('Error fetching Burnt End stories:', error);
@@ -77,8 +88,13 @@ export function BurntEndStories() {
     fetchStories();
   }, []);
 
-  // Don't render section if no stories or still loading
-  if (loading || stories.length === 0) {
+  // Don't render section if still loading or no stories found
+  if (loading) {
+    return null;
+  }
+
+  // If no Burnt End stories, don't show the section
+  if (stories.length === 0) {
     return null;
   }
 
