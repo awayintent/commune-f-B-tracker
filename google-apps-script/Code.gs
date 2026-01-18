@@ -449,15 +449,15 @@ const RSS_FEEDS = [
 const SCRAPE_SITES = [
   {
     name: 'The Straits Times',
-    searchUrl: 'https://www.straitstimes.com/search?q=',
+    searchUrl: 'https://www.straitstimes.com/search?searchkey=',
     baseUrl: 'https://www.straitstimes.com',
-    type: 'search'
+    type: 'html'
   },
   {
     name: 'CNA',
-    searchUrl: 'https://www.channelnewsasia.com/api/v1/search?q=',
+    searchUrl: 'https://www.channelnewsasia.com/search?q=',
     baseUrl: 'https://www.channelnewsasia.com',
-    type: 'api'
+    type: 'html'
   }
 ];
 
@@ -859,20 +859,35 @@ function searchSiteForClosures(site) {
   
   searchTerms.forEach(term => {
     try {
-      let results = [];
+      Logger.log(`Searching ${site.name} for: ${term}`);
       
-      if (site.type === 'api') {
-        // CNA has a search API
-        results = searchCNA(term, site);
+      // Build search URL with proper encoding
+      let searchUrl;
+      if (site.name === 'The Straits Times') {
+        searchUrl = `${site.searchUrl}${encodeURIComponent(term)}&sort=relevancydate`;
       } else {
-        // Straits Times - scrape search page
-        results = searchStraitsTimes(term, site);
+        searchUrl = `${site.searchUrl}${encodeURIComponent(term)}`;
       }
       
-      articles.push(...results);
+      const response = UrlFetchApp.fetch(searchUrl, {
+        muteHttpExceptions: true,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html'
+        }
+      });
+      
+      if (response.getResponseCode() === 200) {
+        const html = response.getContentText();
+        const results = extractArticlesFromSearchPage(html, site);
+        Logger.log(`Found ${results.length} results for "${term}"`);
+        articles.push(...results);
+      } else {
+        Logger.log(`Failed to fetch search results: ${response.getResponseCode()}`);
+      }
       
       // Delay to avoid rate limiting
-      Utilities.sleep(1000);
+      Utilities.sleep(1500);
       
     } catch (error) {
       Logger.log(`Error searching ${site.name} for "${term}": ${error}`);
@@ -889,121 +904,69 @@ function searchSiteForClosures(site) {
 }
 
 /**
- * Search CNA using their API
+ * Extract articles from search results HTML
+ * Works for both CNA and Straits Times
  */
-function searchCNA(term, site) {
+function extractArticlesFromSearchPage(html, site) {
   const articles = [];
   
-  try {
-    // CNA search API endpoint
-    const searchUrl = `${site.searchUrl}${encodeURIComponent(term)}&categories=food&page=1&pageSize=20`;
+  // Pattern 1: Look for article links with href and title/text
+  const linkPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi;
+  let match;
+  
+  while ((match = linkPattern.exec(html)) !== null) {
+    let url = match[1];
+    let title = match[2].trim();
     
-    const response = UrlFetchApp.fetch(searchUrl, {
-      muteHttpExceptions: true,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CommuneBot/1.0)',
-        'Accept': 'application/json'
-      }
-    });
+    // Clean up title - remove HTML tags if any
+    title = title.replace(/<[^>]+>/g, '').trim();
     
-    if (response.getResponseCode() === 200) {
-      const data = JSON.parse(response.getContentText());
-      
-      // Parse CNA API response
-      if (data.results && Array.isArray(data.results)) {
-        data.results.forEach(result => {
-          if (result.title && result.url) {
-            // Filter for 2025 articles
-            const pubDate = new Date(result.publishedDate || result.createdDate);
-            if (pubDate >= new Date('2025-01-01')) {
-              articles.push({
-                title: result.title,
-                url: result.url.startsWith('http') ? result.url : site.baseUrl + result.url
-              });
-            }
-          }
-        });
-      }
+    // Skip if title is too short or looks like navigation
+    if (title.length < 20) continue;
+    
+    // Make URL absolute
+    if (url.startsWith('/')) {
+      url = site.baseUrl + url;
     }
-  } catch (error) {
-    Logger.log(`CNA API error: ${error}`);
+    
+    // Only include URLs from the target site
+    if (url.includes(site.baseUrl) && 
+        !url.includes('#') && 
+        !url.includes('javascript:') &&
+        !url.includes('/search') &&
+        !url.includes('/tag/')) {
+      articles.push({ title, url });
+    }
   }
   
-  return articles;
-}
-
-/**
- * Search Straits Times by scraping their search page
- */
-function searchStraitsTimes(term, site) {
-  const articles = [];
-  
-  try {
-    const searchUrl = `${site.searchUrl}${encodeURIComponent(term)}`;
+  // Pattern 2: Look for h3/h4 headlines with links
+  const headlinePattern = /<h[34][^>]*><a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a><\/h[34]>/gi;
+  while ((match = headlinePattern.exec(html)) !== null) {
+    let url = match[1];
+    let title = match[2].trim();
     
-    const response = UrlFetchApp.fetch(searchUrl, {
-      muteHttpExceptions: true,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html'
-      }
-    });
-    
-    if (response.getResponseCode() === 200) {
-      const html = response.getContentText();
-      
-      // Extract article links from search results
-      // ST uses various patterns, let's try multiple
-      
-      // Pattern 1: Standard article links
-      const pattern1 = /<a[^>]*href="(\/[^"]*)"[^>]*class="[^"]*story[^"]*"[^>]*>([^<]+)<\/a>/gi;
-      let match;
-      
-      while ((match = pattern1.exec(html)) !== null) {
-        const url = site.baseUrl + match[1];
-        const title = match[2].trim().replace(/<[^>]+>/g, '');
-        
-        if (title.length > 15 && !articles.find(a => a.url === url)) {
-          articles.push({ title, url });
-        }
-      }
-      
-      // Pattern 2: JSON-LD structured data
-      const jsonLdPattern = /<script type="application\/ld\+json">([^<]+)<\/script>/gi;
-      while ((match = jsonLdPattern.exec(html)) !== null) {
-        try {
-          const jsonData = JSON.parse(match[1]);
-          if (jsonData['@type'] === 'NewsArticle' && jsonData.headline && jsonData.url) {
-            const pubDate = new Date(jsonData.datePublished);
-            if (pubDate >= new Date('2025-01-01')) {
-              articles.push({
-                title: jsonData.headline,
-                url: jsonData.url
-              });
-            }
-          }
-        } catch (e) {
-          // Skip invalid JSON
-        }
-      }
-      
-      // Pattern 3: Generic article links with data attributes
-      const pattern3 = /<article[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>[\s\S]*?<h[0-9][^>]*>([^<]+)<\/h[0-9]>/gi;
-      while ((match = pattern3.exec(html)) !== null) {
-        let url = match[1];
-        const title = match[2].trim();
-        
-        if (!url.startsWith('http')) {
-          url = site.baseUrl + url;
-        }
-        
-        if (title.length > 15 && !articles.find(a => a.url === url)) {
-          articles.push({ title, url });
-        }
-      }
+    if (url.startsWith('/')) {
+      url = site.baseUrl + url;
     }
-  } catch (error) {
-    Logger.log(`Straits Times scraping error: ${error}`);
+    
+    if (url.includes(site.baseUrl) && title.length > 20) {
+      articles.push({ title, url });
+    }
+  }
+  
+  // Pattern 3: data-* attributes that might contain article info
+  const dataPattern = /data-href=["']([^"']+)["'][^>]*data-title=["']([^"']+)["']/gi;
+  while ((match = dataPattern.exec(html)) !== null) {
+    let url = match[1];
+    let title = match[2].trim();
+    
+    if (url.startsWith('/')) {
+      url = site.baseUrl + url;
+    }
+    
+    if (url.includes(site.baseUrl) && title.length > 20) {
+      articles.push({ title, url });
+    }
   }
   
   return articles;
