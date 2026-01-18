@@ -755,6 +755,7 @@ function processRSSFeeds(sheet, existingUrls, nextCandidateId) {
 
 /**
  * Process HTML scraping sites (Straits Times, CNA)
+ * Uses Google Search to find articles from Jan 1, 2025 onwards
  */
 function processScrapeSites(sheet, existingUrls, nextCandidateId) {
   let newCandidates = 0;
@@ -762,25 +763,10 @@ function processScrapeSites(sheet, existingUrls, nextCandidateId) {
   
   SCRAPE_SITES.forEach(site => {
     try {
-      Logger.log(`Scraping ${site.name} from ${site.url}`);
+      Logger.log(`Searching ${site.name} for articles since Jan 1, 2025`);
       
-      const response = UrlFetchApp.fetch(site.url, {
-        muteHttpExceptions: true,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; CommuneBot/1.0)'
-        }
-      });
-      
-      if (response.getResponseCode() !== 200) {
-        Logger.log(`Failed to fetch ${site.url}: ${response.getResponseCode()}`);
-        return;
-      }
-      
-      const html = response.getContentText();
-      
-      // Extract article headlines and URLs using regex
-      // This is a simple approach - looks for links with text
-      const articles = extractArticlesFromHTML(html, site.url);
+      // Use Google Search to find recent articles about closures
+      const articles = searchSiteForClosures(site);
       
       Logger.log(`Found ${articles.length} articles from ${site.name}`);
       
@@ -853,42 +839,45 @@ function processScrapeSites(sheet, existingUrls, nextCandidateId) {
 }
 
 /**
- * Extract articles from HTML content
+ * Search a site for closure-related articles using Google Search
  * Returns array of {title, url} objects
  */
-function extractArticlesFromHTML(html, baseUrl) {
+function searchSiteForClosures(site) {
   const articles = [];
   
-  // Remove script and style tags
-  html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-  html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  // Build search query for closure-related articles since Jan 1, 2025
+  const domain = site.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  const closureTerms = ['close', 'closes', 'closed', 'closing', 'shut', 'shutter', 'farewell', 'last day'];
   
-  // Extract links with text - looking for article patterns
-  // Pattern: <a href="URL">TITLE</a>
-  const linkPattern = /<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi;
-  let match;
-  
-  while ((match = linkPattern.exec(html)) !== null) {
-    let url = match[1];
-    const title = match[2].trim();
-    
-    // Skip empty titles or navigation links
-    if (!title || title.length < 10) continue;
-    
-    // Make URL absolute if it's relative
-    if (url.startsWith('/')) {
-      const domain = baseUrl.match(/^https?:\/\/[^\/]+/)[0];
-      url = domain + url;
+  // Search for each closure term
+  closureTerms.forEach(term => {
+    try {
+      // Google Custom Search API query
+      // Format: site:domain "term" after:2025-01-01
+      const query = `site:${domain} "${term}" restaurant OR cafe OR bar after:2025-01-01`;
+      
+      // Use Google's search (scraping search results)
+      const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}&num=20`;
+      
+      const response = UrlFetchApp.fetch(searchUrl, {
+        muteHttpExceptions: true,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+      });
+      
+      if (response.getResponseCode() === 200) {
+        const html = response.getContentText();
+        const results = parseGoogleSearchResults(html, site.url);
+        articles.push(...results);
+        
+        // Small delay to avoid rate limiting
+        Utilities.sleep(2000);
+      }
+    } catch (error) {
+      Logger.log(`Error searching for "${term}": ${error}`);
     }
-    
-    // Only include URLs that look like articles (not navigation, etc)
-    if (url.includes(baseUrl) && 
-        !url.includes('#') && 
-        !url.includes('javascript:') &&
-        title.length > 15) {
-      articles.push({ title, url });
-    }
-  }
+  });
   
   // Remove duplicates
   const seen = new Set();
@@ -897,6 +886,55 @@ function extractArticlesFromHTML(html, baseUrl) {
     seen.add(article.url);
     return true;
   });
+}
+
+/**
+ * Parse Google search results HTML to extract article links
+ */
+function parseGoogleSearchResults(html, baseUrl) {
+  const articles = [];
+  
+  // Google search results pattern: <a href="/url?q=ACTUAL_URL&...">
+  // We need to extract the actual URL and the title
+  const resultPattern = /<a[^>]*href="\/url\?q=([^&"]+)[^"]*"[^>]*><br><div[^>]*><div[^>]*>([^<]+)<\/div>/gi;
+  let match;
+  
+  while ((match = resultPattern.exec(html)) !== null) {
+    try {
+      let url = decodeURIComponent(match[1]);
+      const title = match[2].trim();
+      
+      // Only include URLs from the target site
+      if (url.includes(baseUrl) && title.length > 15) {
+        articles.push({ title, url });
+      }
+    } catch (e) {
+      // Skip malformed results
+    }
+  }
+  
+  // Alternative pattern for newer Google search results
+  const altPattern = /<a[^>]*href="([^"]+)"[^>]*><h3[^>]*>([^<]+)<\/h3>/gi;
+  while ((match = altPattern.exec(html)) !== null) {
+    try {
+      let url = match[1];
+      const title = match[2].trim();
+      
+      // Clean up Google redirect URLs
+      if (url.startsWith('/url?q=')) {
+        url = decodeURIComponent(url.split('?q=')[1].split('&')[0]);
+      }
+      
+      // Only include URLs from the target site
+      if (url.includes(baseUrl) && title.length > 15) {
+        articles.push({ title, url });
+      }
+    } catch (e) {
+      // Skip malformed results
+    }
+  }
+  
+  return articles;
 }
 
 /**
