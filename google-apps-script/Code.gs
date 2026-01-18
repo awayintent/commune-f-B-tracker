@@ -891,8 +891,21 @@ function searchSiteForClosures(site) {
       
       if (response.getResponseCode() === 200) {
         const html = response.getContentText();
+        
+        // Debug: Log a snippet of the HTML to see structure
+        const snippet = html.substring(0, 2000);
+        Logger.log(`HTML snippet: ${snippet.substring(0, 500)}...`);
+        
         const results = extractArticlesFromSearchPage(html, site);
         Logger.log(`Found ${results.length} results for "${term}"`);
+        
+        // Log first few results for debugging
+        if (results.length > 0) {
+          results.slice(0, 3).forEach(r => {
+            Logger.log(`  - ${r.title.substring(0, 60)}... | ${r.url}`);
+          });
+        }
+        
         articles.push(...results);
       } else {
         Logger.log(`Failed to fetch search results: ${response.getResponseCode()}`);
