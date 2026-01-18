@@ -46,7 +46,7 @@ function parseCSV(csvText: string): Closure[] {
     // Simple CSV parser - handles quoted fields
     const fields = parseCSVLine(line);
     
-    if (fields.length < 11) {
+    if (fields.length < 10) {
       continue; // Skip incomplete rows
     }
 
@@ -57,11 +57,10 @@ function parseCSV(csvText: string): Closure[] {
       outlet_name: fields[3] || '',
       address: fields[4] || '',
       category: fields[5] || '',
-      status: (fields[6] === 'Confirmed' ? 'Confirmed' : 'Reported'),
-      last_day: fields[7] || '',
-      description: fields[8] || '',
-      source_urls: fields[9] || '',
-      tags: fields[10] || '',
+      last_day: fields[6] || '',
+      description: fields[7] || '',
+      source_urls: fields[8] || '',
+      tags: fields[9] || '',
     });
   }
 

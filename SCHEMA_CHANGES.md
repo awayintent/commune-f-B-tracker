@@ -1,5 +1,62 @@
 # Schema Changes Log
 
+## Change #6: Removed `status` Column
+
+**Date:** January 18, 2026  
+**Reason:** The `status` field (Reported/Confirmed) is redundant. If an entry exists in the Closures sheet, it has already been reviewed and accepted by the admin. Unverified entries remain in the Submissions sheet.
+
+### What Changed
+
+#### Closures Sheet (Public)
+**Before (11 columns):**
+```
+closure_id | added_at | business_name | outlet_name | address | category | status | last_day | description | source_urls | tags
+```
+
+**After (10 columns):**
+```
+closure_id | added_at | business_name | outlet_name | address | category | last_day | description | source_urls | tags
+```
+
+**Changes:**
+- ❌ Removed: `status` (was column 6)
+- ✅ Simplification: Presence in Closures sheet = verified/accepted
+
+### Files Updated
+
+1. **google-apps-script/Code.gs**
+   - Updated `CLOSURES_COLUMNS` mapping (all columns after category shifted down by 1)
+   - Removed `'Reported'` default value in `acceptSubmission()`
+
+2. **src/app/data/types.ts**
+   - Removed `status: 'Reported' | 'Confirmed'` from Closure interface
+
+3. **src/app/data/closures.ts**
+   - Updated CSV parsing to expect 10 columns instead of 11
+   - Removed status field mapping
+
+### Migration Guide
+
+If you already have data in your sheets:
+
+**For Closures sheet:**
+1. Delete the `status` column (column G)
+2. Verify you now have 10 columns
+3. No data loss - all entries in Closures are implicitly verified
+
+**Google Apps Script:**
+- Copy the updated `Code.gs` from `google-apps-script/Code.gs`
+- Replace your existing script completely
+
+### Benefits
+
+✅ **Simpler schema** - One less redundant column  
+✅ **Clearer semantics** - Closures sheet = verified data  
+✅ **Less maintenance** - No need to track verification status  
+✅ **Implicit trust** - Being in Closures means it's been reviewed
+
+---
+
 ## Change #5: Removed `evidence_excerpt` Column
 
 **Date:** January 18, 2026  
@@ -281,7 +338,7 @@ Potential future changes to consider:
 ## Summary of All Changes
 
 **Current Schema:**
-- **Closures:** 11 columns (was 15)
+- **Closures:** 10 columns (was 15)
 - **Submissions:** 15 columns (10 form + 5 review, was 25)
 
 **Removed Columns:**
@@ -289,15 +346,17 @@ Potential future changes to consider:
 2. `area` / `area_raw` → Include in `address` field
 3. `announced_date` → Use `last_day` instead
 4. `evidence_excerpt` → Source URLs are sufficient
-5. Multiple submission tracking columns → Simplified to Google Forms defaults
+5. `status` → Presence in Closures = verified
+6. Multiple submission tracking columns → Simplified to Google Forms defaults
 
 **Benefits:**
-- 27% fewer columns overall (11 vs 15 for Closures)
+- 33% fewer columns overall (10 vs 15 for Closures)
 - Simpler, more intuitive schema
 - Easier for users to submit
 - Less redundant data
 - More realistic for actual closure scenarios
 - Direct integration with Google Forms
+- Clearer semantics (Closures sheet = verified data)
 
 ---
 

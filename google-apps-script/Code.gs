@@ -53,11 +53,10 @@ const CLOSURES_COLUMNS = {
   outlet_name: 3,
   address: 4,
   category: 5,
-  status: 6,
-  last_day: 7,
-  description: 8,
-  source_urls: 9,
-  tags: 10
+  last_day: 6,
+  description: 7,
+  source_urls: 8,
+  tags: 9
 };
 
 // Review columns (added to the right of form columns in Submissions sheet)
@@ -355,7 +354,6 @@ function acceptSubmission(row) {
     data[FORM_COLUMNS['Outlet/Branch Name']],       // outlet_name
     data[FORM_COLUMNS['Business Address']],         // address
     '',                                               // category - to be filled manually
-    'Reported',                                       // status - default
     data[FORM_COLUMNS['Last Day of Operation']],    // last_day
     data[FORM_COLUMNS['Reason for Closure']],       // description
     data[FORM_COLUMNS['Source URL']],               // source_urls

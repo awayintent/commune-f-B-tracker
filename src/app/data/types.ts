@@ -7,7 +7,6 @@ export interface Closure {
   outlet_name: string;
   address: string;
   category: string;
-  status: 'Reported' | 'Confirmed';
   last_day: string;
   description: string;
   source_urls: string;
