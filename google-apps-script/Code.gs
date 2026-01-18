@@ -26,7 +26,8 @@
 
 const SHEET_NAMES = {
   CLOSURES: 'Closures',
-  SUBMISSIONS: 'Submissions'
+  SUBMISSIONS: 'Submissions',
+  CANDIDATES: 'Candidates'
 };
 
 // Google Forms creates these column names automatically
@@ -425,4 +426,313 @@ function addReviewColumns() {
   sheet.getRange(1, REVIEW_COL_OFFSET + 1, 1, headers.length).setValues([headers]);
   
   Logger.log('Review columns added');
+}
+
+// =============================================================================
+// RSS SCRAPING & CANDIDATE DISCOVERY
+// =============================================================================
+
+/**
+ * RSS feed sources for Singapore F&B news
+ */
+const RSS_FEEDS = [
+  'https://www.straitstimes.com/rss/food',
+  'https://www.channelnewsasia.com/rss/food',
+  'https://mothership.sg/feed/',
+  'https://sethlui.com/feed/',
+  'https://danielfooddiary.com/feed/',
+  'https://www.eatbook.sg/feed/'
+];
+
+/**
+ * Keywords that indicate potential closures
+ */
+const CLOSURE_KEYWORDS = [
+  'close', 'closes', 'closed', 'closing', 'shut', 'shutting', 'shutter',
+  'cease', 'ceases', 'ceased', 'ceasing', 'farewell', 'final day',
+  'last day', 'goodbye', 'end of', 'no more', 'permanently'
+];
+
+/**
+ * Initialize Candidates sheet with headers
+ * Run this once to set up the sheet
+ */
+function initializeCandidatesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEET_NAMES.CANDIDATES);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAMES.CANDIDATES);
+  }
+  
+  const headers = [
+    'candidate_id',
+    'found_at',
+    'publisher',
+    'headline',
+    'url',
+    'published_at',
+    'matched_terms',
+    'entity_guess',
+    'area_guess',
+    'status',
+    'review_notes'
+  ];
+  
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  
+  Logger.log('Candidates sheet initialized');
+}
+
+/**
+ * Fetch RSS feeds and identify closure-related headlines
+ * This should be run on a time-driven trigger (every 6-12 hours)
+ */
+function fetchCandidates() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEET_NAMES.CANDIDATES);
+  
+  if (!sheet) {
+    Logger.log('Candidates sheet not found. Run initializeCandidatesSheet() first.');
+    return;
+  }
+  
+  // Build index of existing candidate URLs to avoid duplicates
+  const existingUrls = new Set();
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    const urlCol = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
+    urlCol.forEach(row => {
+      if (row[0]) existingUrls.add(row[0].toString().trim());
+    });
+  }
+  
+  let newCandidates = 0;
+  const scriptProps = PropertiesService.getScriptProperties();
+  let nextCandidateId = parseInt(scriptProps.getProperty('NEXT_CANDIDATE_ID') || '1');
+  
+  // Fetch each RSS feed
+  RSS_FEEDS.forEach(feedUrl => {
+    try {
+      const response = UrlFetchApp.fetch(feedUrl, { muteHttpExceptions: true });
+      
+      if (response.getResponseCode() !== 200) {
+        Logger.log(`Failed to fetch ${feedUrl}: ${response.getResponseCode()}`);
+        return;
+      }
+      
+      const xml = response.getContentText();
+      const document = XmlService.parse(xml);
+      const root = document.getRootElement();
+      
+      // Extract publisher name from feed
+      const publisher = extractPublisher(feedUrl);
+      
+      // Parse items (works for both RSS 2.0 and Atom)
+      const items = root.getChild('channel') 
+        ? root.getChild('channel').getChildren('item')
+        : root.getChildren('entry');
+      
+      items.forEach(item => {
+        try {
+          const headline = getElementText(item, 'title');
+          const url = getElementText(item, 'link');
+          const pubDate = getElementText(item, 'pubDate') || getElementText(item, 'published');
+          
+          if (!headline || !url || existingUrls.has(url)) {
+            return;
+          }
+          
+          // Check if headline matches closure keywords
+          const matchedTerms = findMatchedKeywords(headline);
+          
+          if (matchedTerms.length > 0) {
+            // Extract potential business name and area from headline
+            const entityGuess = extractBusinessName(headline);
+            const areaGuess = extractArea(headline);
+            
+            // Add to candidates sheet
+            const candidateId = `CAND-${String(nextCandidateId).padStart(5, '0')}`;
+            const row = [
+              candidateId,
+              new Date(),
+              publisher,
+              headline,
+              url,
+              pubDate || '',
+              matchedTerms.join(', '),
+              entityGuess,
+              areaGuess,
+              'new',
+              ''
+            ];
+            
+            sheet.appendRow(row);
+            newCandidates++;
+            nextCandidateId++;
+            existingUrls.add(url);
+          }
+        } catch (itemError) {
+          Logger.log(`Error processing item: ${itemError}`);
+        }
+      });
+      
+    } catch (feedError) {
+      Logger.log(`Error fetching feed ${feedUrl}: ${feedError}`);
+    }
+  });
+  
+  // Save next candidate ID
+  scriptProps.setProperty('NEXT_CANDIDATE_ID', nextCandidateId.toString());
+  
+  Logger.log(`Fetch complete. Found ${newCandidates} new candidates.`);
+  
+  // Send Telegram notification if new candidates found
+  if (newCandidates > 0) {
+    sendTelegram(`🔍 Found ${newCandidates} new closure candidate(s) from RSS feeds. Review in CANDIDATES sheet.`);
+  }
+}
+
+/**
+ * Helper: Extract publisher name from feed URL
+ */
+function extractPublisher(url) {
+  if (url.includes('straitstimes')) return 'The Straits Times';
+  if (url.includes('channelnewsasia')) return 'CNA';
+  if (url.includes('mothership')) return 'Mothership';
+  if (url.includes('sethlui')) return 'Seth Lui';
+  if (url.includes('danielfooddiary')) return 'Daniel Food Diary';
+  if (url.includes('eatbook')) return 'Eatbook';
+  return 'Unknown';
+}
+
+/**
+ * Helper: Get text content from XML element
+ */
+function getElementText(element, tagName) {
+  try {
+    const child = element.getChild(tagName);
+    return child ? child.getText() : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Helper: Find matched closure keywords in text
+ */
+function findMatchedKeywords(text) {
+  const lowerText = text.toLowerCase();
+  return CLOSURE_KEYWORDS.filter(keyword => lowerText.includes(keyword));
+}
+
+/**
+ * Helper: Extract potential business name from headline
+ * This is a simple heuristic - can be improved
+ */
+function extractBusinessName(headline) {
+  // Look for quoted text or capitalized words
+  const quotedMatch = headline.match(/'([^']+)'|"([^"]+)"/);
+  if (quotedMatch) {
+    return quotedMatch[1] || quotedMatch[2];
+  }
+  
+  // Look for capitalized phrases before closure keywords
+  const words = headline.split(' ');
+  let businessName = [];
+  for (let i = 0; i < words.length; i++) {
+    if (words[i].match(/^[A-Z]/)) {
+      businessName.push(words[i]);
+    } else if (businessName.length > 0) {
+      break;
+    }
+  }
+  
+  return businessName.length > 0 ? businessName.join(' ') : '';
+}
+
+/**
+ * Helper: Extract area from headline
+ */
+function extractArea(headline) {
+  const areas = [
+    'Orchard', 'Marina Bay', 'Raffles Place', 'Tanjong Pagar', 'Chinatown',
+    'Bugis', 'Clarke Quay', 'Robertson Quay', 'Dempsey', 'Holland Village',
+    'Tiong Bahru', 'Katong', 'East Coast', 'Bedok', 'Tampines', 'Pasir Ris',
+    'Changi', 'Woodlands', 'Yishun', 'Ang Mo Kio', 'Bishan', 'Toa Payoh',
+    'Novena', 'Newton', 'Bukit Timah', 'Clementi', 'Jurong', 'Boon Lay',
+    'Sentosa', 'Punggol', 'Sengkang', 'Hougang', 'Serangoon', 'Potong Pasir'
+  ];
+  
+  for (const area of areas) {
+    if (headline.includes(area)) {
+      return area;
+    }
+  }
+  
+  return '';
+}
+
+/**
+ * Convert selected candidates to draft submissions
+ * Admin should first review candidates and mark promising ones as 'queued'
+ * This function converts 'queued' candidates to submissions
+ */
+function draftSubmissionsFromCandidates() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const candidatesSheet = ss.getSheetByName(SHEET_NAMES.CANDIDATES);
+  const submissionsSheet = ss.getSheetByName(SHEET_NAMES.SUBMISSIONS);
+  
+  if (!candidatesSheet || !submissionsSheet) {
+    Logger.log('Required sheets not found');
+    return;
+  }
+  
+  const data = candidatesSheet.getDataRange().getValues();
+  let drafted = 0;
+  
+  // Process each candidate with status 'queued'
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const candidateId = row[0];
+    const foundAt = row[1];
+    const publisher = row[2];
+    const headline = row[3];
+    const url = row[4];
+    const publishedAt = row[5];
+    const matchedTerms = row[6];
+    const entityGuess = row[7];
+    const areaGuess = row[8];
+    const status = row[9];
+    
+    if (status === 'queued') {
+      // Create a draft submission
+      const submissionRow = [
+        new Date(), // Timestamp
+        entityGuess || headline, // Business Name
+        '', // Outlet/Branch Name
+        '', // Business address
+        '', // Last Day of Operation
+        `Closure reported by ${publisher}`, // Reason for Closure
+        url, // Source URL
+        `Headline: ${headline}\nMatched terms: ${matchedTerms}`, // Additional Notes
+        'System (RSS)', // Submitter Name
+        publisher // Submitter Contact
+      ];
+      
+      submissionsSheet.appendRow(submissionRow);
+      
+      // Update candidate status to 'promoted'
+      candidatesSheet.getRange(i + 1, 10).setValue('promoted');
+      
+      drafted++;
+    }
+  }
+  
+  Logger.log(`Drafted ${drafted} submissions from candidates`);
+  
+  if (drafted > 0) {
+    sendTelegram(`📝 Created ${drafted} draft submission(s) from RSS candidates. Review in SUBMISSIONS sheet.`);
+  }
 }
