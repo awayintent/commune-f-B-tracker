@@ -18,10 +18,11 @@ export function BurntEndStories() {
   useEffect(() => {
     async function fetchStories() {
       try {
-        // Fetch RSS feed directly
+        // Fetch RSS feed via CORS proxy
         const rssUrl = 'https://www.commune-asia.com/feed';
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
         
-        const response = await fetch(rssUrl);
+        const response = await fetch(proxyUrl);
         if (!response.ok) {
           throw new Error('Failed to fetch RSS feed');
         }
