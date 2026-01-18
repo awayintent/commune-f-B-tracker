@@ -108,16 +108,8 @@ export function ClosuresTable() {
   }
 
   return (
-    <div className="w-full">
-      {/* Container with space for ads */}
-      <div className="flex gap-6 items-start">
-        {/* Left ad space - reserved for future */}
-        <div className="hidden xl:block w-40 flex-shrink-0">
-          {/* Ad space placeholder */}
-        </div>
-
-        {/* Main content */}
-        <div className="flex-1 space-y-4">
+    <div className="w-full space-y-4">
+      {/* TODO: Add left/right ad spaces (160px each) when ready for monetization */}
           {/* Search Bar */}
           <div className="flex items-center gap-2 max-w-md">
             <div className="relative flex-1">
@@ -239,12 +231,6 @@ export function ClosuresTable() {
             </Table>
           </div>
         </div>
-
-        {/* Right ad space - reserved for future */}
-        <div className="hidden xl:block w-40 flex-shrink-0">
-          {/* Ad space placeholder */}
-        </div>
-      </div>
     </div>
   );
 }
