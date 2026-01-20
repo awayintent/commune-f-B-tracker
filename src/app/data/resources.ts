@@ -24,40 +24,30 @@ export interface Article {
 /**
  * Upcoming F&B Industry Events
  * 
- * Sources to check regularly:
- * - Eventbrite Singapore: https://www.eventbrite.sg (search: "F&B", "Restaurant", "Food Business")
- * - Peatix Singapore: https://peatix.com/search?country=SG (search: "F&B", "Restaurant")
- * - LinkedIn Events: https://www.linkedin.com/events (follow Restaurant Association of Singapore)
+ * MANUALLY CURATED - Update this list with real event links from:
+ * - Eventbrite Singapore: https://www.eventbrite.sg/d/singapore--singapore/food-and-drink--business/
+ * - Peatix Singapore: https://peatix.com/search?country=SG&q=restaurant
+ * - LinkedIn Events: https://www.linkedin.com/events
  * 
- * Update monthly with relevant Singapore F&B events.
- * Focus on: networking, workshops, industry conferences, business development.
+ * TO UPDATE: Search those platforms monthly and add actual event URLs here
+ * Leave this array EMPTY if no upcoming events (better than fake events)
  */
 export const events: Event[] = [
-  {
-    id: 1,
-    title: "F&B Industry Networking & Insights",
-    date: "Feb 27, 2026",
-    location: "Suntec Convention Centre",
-    url: "https://www.eventbrite.sg"
-  },
-  {
-    id: 2,
-    title: "Restaurant Business Operations Workshop",
-    date: "Mar 8, 2026",
-    location: "NTUC Centre",
-    url: "https://peatix.com"
-  },
-  {
-    id: 3,
-    title: "Singapore F&B Summit 2026",
-    date: "Mar 15-17, 2026",
-    location: "Marina Bay Sands",
-    url: "https://www.linkedin.com/events"
-  }
+  // ADD REAL EVENTS HERE AS YOU FIND THEM
+  // Example:
+  // {
+  //   id: 1,
+  //   title: "Event Name",
+  //   date: "Mar 15, 2026",
+  //   location: "Venue Name",
+  //   url: "https://actual-event-url.com"
+  // }
 ];
 
 /**
  * High-Quality F&B Industry Articles
+ * 
+ * MANUALLY CURATED - Update this list with real, working article links
  * 
  * Criteria for inclusion:
  * - Authoritative sources (industry experts, established publications)
@@ -71,7 +61,7 @@ export const events: Event[] = [
  * - Insight Out by Carbonate: https://www.carbonateinsights.com
  * - Snaxshot: https://www.snaxshot.com
  * 
- * Update this section monthly with the latest articles from these sources.
+ * TO UPDATE: Replace these with actual article URLs as you find good content
  */
 export const articles: Article[] = [
   {
@@ -79,29 +69,13 @@ export const articles: Article[] = [
     title: "Why Ghost Kitchens Failed (And What's Coming Next)",
     source: "Restaurant 101 by David Mann",
     url: "https://davidrmann3.substack.com/p/why-ghost-kitchens-failed-and-whats"
-  },
-  {
-    id: 2,
-    title: "Inside Scoop: Sharp insights for hospitality and F&B brands",
-    source: "Insight Out by Carbonate",
-    url: "https://www.carbonateinsights.com"
-  },
-  {
-    id: 3,
-    title: "Product trends and market insights for F&B",
-    source: "Snaxshot",
-    url: "https://www.snaxshot.com"
-  },
-  {
-    id: 4,
-    title: "Rising costs push more F&B outlets to close in Singapore",
-    source: "The Straits Times",
-    url: "https://www.straitstimes.com/singapore"
-  },
-  {
-    id: 5,
-    title: "F&B Industry Trends and Insights",
-    source: "Channel NewsAsia",
-    url: "https://www.channelnewsasia.com/singapore"
   }
+  // ADD MORE ARTICLES HERE AS YOU FIND THEM
+  // Example:
+  // {
+  //   id: 2,
+  //   title: "Your Article Title",
+  //   source: "Source Name",
+  //   url: "https://actual-article-url.com"
+  // }
 ];
