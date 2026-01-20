@@ -1314,3 +1314,379 @@ function checkDuplicateInClosures(closuresSheet, businessName) {
   
   return false;
 }
+
+// ============================================================================
+// EVENTS & ARTICLES SCRAPING
+// ============================================================================
+
+/**
+ * Article and Event RSS Feeds
+ */
+const ARTICLE_RSS_FEEDS = [
+  {
+    name: 'Restaurant 101',
+    author: 'David Mann',
+    url: 'https://davidrmann3.substack.com/feed'
+  },
+  {
+    name: 'Insight Out',
+    author: 'Carbonate',
+    url: 'https://www.carbonateinsights.com/feed'
+  },
+  {
+    name: 'Snaxshot',
+    author: 'Snaxshot',
+    url: 'https://www.snaxshot.com/feed'
+  }
+];
+
+/**
+ * Initialize Events sheet with headers
+ */
+function initializeEventsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let eventsSheet = ss.getSheetByName('Events');
+  
+  if (!eventsSheet) {
+    eventsSheet = ss.insertSheet('Events');
+  }
+  
+  const headers = [
+    'event_id',
+    'title',
+    'date',
+    'location',
+    'url',
+    'source',
+    'scraped_at'
+  ];
+  
+  eventsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  eventsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  eventsSheet.setFrozenRows(1);
+  
+  Logger.log('Events sheet initialized');
+}
+
+/**
+ * Initialize Articles sheet with headers
+ */
+function initializeArticlesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let articlesSheet = ss.getSheetByName('Articles');
+  
+  if (!articlesSheet) {
+    articlesSheet = ss.insertSheet('Articles');
+  }
+  
+  const headers = [
+    'article_id',
+    'title',
+    'source',
+    'author',
+    'url',
+    'published_date',
+    'scraped_at'
+  ];
+  
+  articlesSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  articlesSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  articlesSheet.setFrozenRows(1);
+  
+  Logger.log('Articles sheet initialized');
+}
+
+/**
+ * Fetch articles from RSS feeds
+ * Run this manually or set up a time-based trigger (daily/weekly)
+ */
+function fetchArticles() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let articlesSheet = ss.getSheetByName('Articles');
+  
+  if (!articlesSheet) {
+    initializeArticlesSheet();
+    articlesSheet = ss.getSheetByName('Articles');
+  }
+  
+  // Get existing article URLs to avoid duplicates
+  const existingUrls = new Set();
+  const lastRow = articlesSheet.getLastRow();
+  if (lastRow > 1) {
+    const urls = articlesSheet.getRange(2, 5, lastRow - 1, 1).getValues();
+    urls.forEach(row => {
+      if (row[0]) existingUrls.add(row[0]);
+    });
+  }
+  
+  let newArticlesCount = 0;
+  
+  // Fetch from each RSS feed
+  ARTICLE_RSS_FEEDS.forEach(feed => {
+    try {
+      Logger.log(`Fetching articles from ${feed.name}...`);
+      
+      const response = UrlFetchApp.fetch(feed.url, {
+        muteHttpExceptions: true,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; GoogleAppsScript)'
+        }
+      });
+      
+      if (response.getResponseCode() !== 200) {
+        Logger.log(`Failed to fetch ${feed.name}: ${response.getResponseCode()}`);
+        return;
+      }
+      
+      let xml = response.getContentText();
+      xml = cleanXml(xml);
+      
+      const document = XmlService.parse(xml);
+      const root = document.getRootElement();
+      const channel = root.getChild('channel');
+      
+      if (!channel) {
+        Logger.log(`No channel found in ${feed.name}`);
+        return;
+      }
+      
+      const items = channel.getChildren('item');
+      Logger.log(`Found ${items.length} items in ${feed.name}`);
+      
+      items.forEach(item => {
+        const title = getElementText(item, 'title');
+        const link = getElementText(item, 'link');
+        const pubDate = getElementText(item, 'pubDate');
+        
+        // Skip if already exists
+        if (existingUrls.has(link)) {
+          return;
+        }
+        
+        // Add to sheet
+        const nextId = getNextArticleId(articlesSheet);
+        const row = [
+          nextId,
+          title,
+          feed.name,
+          feed.author,
+          link,
+          pubDate || new Date().toISOString(),
+          new Date().toISOString()
+        ];
+        
+        articlesSheet.appendRow(row);
+        existingUrls.add(link);
+        newArticlesCount++;
+        
+        Logger.log(`Added article: ${title}`);
+      });
+      
+    } catch (error) {
+      Logger.log(`Error fetching ${feed.name}: ${error.message}`);
+    }
+  });
+  
+  Logger.log(`Articles fetch complete. Added ${newArticlesCount} new articles.`);
+  return newArticlesCount;
+}
+
+/**
+ * Get next article ID
+ */
+function getNextArticleId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 1;
+  
+  const lastId = sheet.getRange(lastRow, 1).getValue();
+  return (parseInt(lastId) || 0) + 1;
+}
+
+/**
+ * Fetch events from Eventbrite search results
+ * Note: This scrapes the public search page, not an API
+ * Run this manually or set up a time-based trigger (weekly)
+ */
+function fetchEvents() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let eventsSheet = ss.getSheetByName('Events');
+  
+  if (!eventsSheet) {
+    initializeEventsSheet();
+    eventsSheet = ss.getSheetByName('Events');
+  }
+  
+  // Get existing event URLs to avoid duplicates
+  const existingUrls = new Set();
+  const lastRow = eventsSheet.getLastRow();
+  if (lastRow > 1) {
+    const urls = eventsSheet.getRange(2, 5, lastRow - 1, 1).getValues();
+    urls.forEach(row => {
+      if (row[0]) existingUrls.add(row[0]);
+    });
+  }
+  
+  let newEventsCount = 0;
+  
+  // Eventbrite Singapore F&B events search
+  const searchUrls = [
+    {
+      url: 'https://www.eventbrite.sg/d/singapore--singapore/food-and-drink--business/',
+      source: 'Eventbrite'
+    },
+    {
+      url: 'https://www.eventbrite.sg/d/singapore--singapore/restaurant/',
+      source: 'Eventbrite'
+    }
+  ];
+  
+  searchUrls.forEach(searchConfig => {
+    try {
+      Logger.log(`Fetching events from ${searchConfig.source}...`);
+      
+      const response = UrlFetchApp.fetch(searchConfig.url, {
+        muteHttpExceptions: true,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; GoogleAppsScript)'
+        }
+      });
+      
+      if (response.getResponseCode() !== 200) {
+        Logger.log(`Failed to fetch events: ${response.getResponseCode()}`);
+        return;
+      }
+      
+      const html = response.getContentText();
+      
+      // Extract events from HTML (basic pattern matching)
+      // This is fragile and may break if Eventbrite changes their structure
+      // For production, consider using Eventbrite API with proper authentication
+      
+      const eventPattern = /<article[^>]*>([\s\S]*?)<\/article>/g;
+      const matches = html.match(eventPattern);
+      
+      if (!matches) {
+        Logger.log('No events found in HTML');
+        return;
+      }
+      
+      matches.slice(0, 5).forEach(eventHtml => { // Limit to 5 events per search
+        try {
+          // Extract title
+          const titleMatch = eventHtml.match(/<h3[^>]*>(.*?)<\/h3>/);
+          const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : null;
+          
+          // Extract date
+          const dateMatch = eventHtml.match(/<time[^>]*datetime="([^"]+)"/);
+          const date = dateMatch ? dateMatch[1] : null;
+          
+          // Extract URL
+          const urlMatch = eventHtml.match(/href="([^"]*\/e\/[^"]+)"/);
+          const url = urlMatch ? urlMatch[1] : null;
+          
+          if (title && url && !existingUrls.has(url)) {
+            const nextId = getNextEventId(eventsSheet);
+            const row = [
+              nextId,
+              title,
+              date || 'TBA',
+              'Singapore',
+              url,
+              searchConfig.source,
+              new Date().toISOString()
+            ];
+            
+            eventsSheet.appendRow(row);
+            existingUrls.add(url);
+            newEventsCount++;
+            
+            Logger.log(`Added event: ${title}`);
+          }
+        } catch (error) {
+          Logger.log(`Error parsing event: ${error.message}`);
+        }
+      });
+      
+    } catch (error) {
+      Logger.log(`Error fetching events from ${searchConfig.source}: ${error.message}`);
+    }
+  });
+  
+  Logger.log(`Events fetch complete. Added ${newEventsCount} new events.`);
+  return newEventsCount;
+}
+
+/**
+ * Get next event ID
+ */
+function getNextEventId(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return 1;
+  
+  const lastId = sheet.getRange(lastRow, 1).getValue();
+  return (parseInt(lastId) || 0) + 1;
+}
+
+/**
+ * Clean up past events (run this weekly to keep the sheet tidy)
+ */
+function cleanupPastEvents() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const eventsSheet = ss.getSheetByName('Events');
+  
+  if (!eventsSheet) {
+    Logger.log('Events sheet not found');
+    return;
+  }
+  
+  const lastRow = eventsSheet.getLastRow();
+  if (lastRow <= 1) return;
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const data = eventsSheet.getRange(2, 1, lastRow - 1, 7).getValues();
+  const rowsToDelete = [];
+  
+  for (let i = data.length - 1; i >= 0; i--) {
+    const dateStr = data[i][2]; // date column
+    if (dateStr && dateStr !== 'TBA') {
+      const eventDate = new Date(dateStr);
+      if (eventDate < today) {
+        rowsToDelete.push(i + 2); // +2 because of 0-index and header row
+      }
+    }
+  }
+  
+  // Delete rows in reverse order
+  rowsToDelete.forEach(rowNum => {
+    eventsSheet.deleteRow(rowNum);
+  });
+  
+  Logger.log(`Cleaned up ${rowsToDelete.length} past events`);
+}
+
+/**
+ * Main scraper function - run this to update both events and articles
+ * Set up a time-based trigger to run this weekly
+ */
+function updateEventsAndArticles() {
+  Logger.log('=== Starting Events & Articles Update ===');
+  
+  const articlesAdded = fetchArticles();
+  const eventsAdded = fetchEvents();
+  cleanupPastEvents();
+  
+  Logger.log('=== Update Complete ===');
+  Logger.log(`Articles added: ${articlesAdded}`);
+  Logger.log(`Events added: ${eventsAdded}`);
+  
+  // Optional: Send Telegram notification
+  const telegramEnabled = getProperty('TELEGRAM_BOT_TOKEN') && getProperty('TELEGRAM_CHAT_ID');
+  if (telegramEnabled) {
+    const message = `📰 Content Update Complete\n\n` +
+                   `✅ Articles added: ${articlesAdded}\n` +
+                   `📅 Events added: ${eventsAdded}`;
+    sendTelegram(message);
+  }
+}

@@ -1,8 +1,35 @@
+import { useState, useEffect } from 'react';
 import { Calendar, Newspaper } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
-import { events, articles } from '@/app/data/resources';
+import { fetchEvents, formatEventDate } from '@/app/data/events';
+import { fetchArticles } from '@/app/data/articles';
+import type { Event } from '@/app/data/events';
+import type { Article } from '@/app/data/articles';
 
 export function EventsAndArticles() {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const [eventsData, articlesData] = await Promise.all([
+          fetchEvents(),
+          fetchArticles()
+        ]);
+        setEvents(eventsData);
+        setArticles(articlesData);
+      } catch (error) {
+        console.error('Error loading events and articles:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
 
   return (
     <section className="py-12">
@@ -34,22 +61,22 @@ export function EventsAndArticles() {
                   {events.map((event) => (
                     event.url ? (
                       <a
-                        key={event.id}
+                        key={event.event_id}
                         href={event.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block border-l-4 border-[#f5903e] pl-4 py-2 hover:bg-gray-50 transition-colors"
-                      >
-                        <h3 className="font-semibold text-[#0b3860] hover:text-[#f5903e]">{event.title}</h3>
-                        <p className="text-sm text-gray-600 mt-1">{event.date}</p>
-                        <p className="text-sm text-gray-500">{event.location}</p>
-                      </a>
+                      className="block border-l-4 border-[#f5903e] pl-4 py-2 hover:bg-gray-50 transition-colors"
+                    >
+                      <h3 className="font-semibold text-[#0b3860] hover:text-[#f5903e]">{event.title}</h3>
+                      <p className="text-sm text-gray-600 mt-1">{formatEventDate(event.date)}</p>
+                      <p className="text-sm text-gray-500">{event.location} • {event.source}</p>
+                    </a>
                     ) : (
-                      <div key={event.id} className="border-l-4 border-[#f5903e] pl-4 py-2">
-                        <h3 className="font-semibold text-[#0b3860]">{event.title}</h3>
-                        <p className="text-sm text-gray-600 mt-1">{event.date}</p>
-                        <p className="text-sm text-gray-500">{event.location}</p>
-                      </div>
+                    <div key={event.event_id} className="border-l-4 border-[#f5903e] pl-4 py-2">
+                      <h3 className="font-semibold text-[#0b3860]">{event.title}</h3>
+                      <p className="text-sm text-gray-600 mt-1">{formatEventDate(event.date)}</p>
+                      <p className="text-sm text-gray-500">{event.location} • {event.source}</p>
+                    </div>
                     )
                   ))}
                 </div>
@@ -78,7 +105,7 @@ export function EventsAndArticles() {
                 <div className="space-y-4">
                   {articles.map((article) => (
                     <a
-                      key={article.id}
+                      key={article.article_id}
                       href={article.url}
                       target="_blank"
                       rel="noopener noreferrer"
