@@ -20,7 +20,7 @@ export function BurntEndStories() {
       try {
         // Fetch RSS feed via CORS proxy
         const rssUrl = 'https://www.commune-asia.com/feed';
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(rssUrl)}`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(rssUrl)}`;
         
         const response = await fetch(proxyUrl);
         if (!response.ok) {
