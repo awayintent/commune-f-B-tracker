@@ -61,7 +61,12 @@ export function EventsAndArticles() {
 
   return (
     <section className="py-12">
-      <h2 className="text-3xl font-bold mb-8 text-center text-[#0b3860]">Resources for F&B Owners</h2>
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold mb-3 text-[#0b3860]">Get help before your business becomes another statistic here</h2>
+        <p className="text-gray-600 max-w-3xl mx-auto">
+          Events and useful articles sourced from authoritative sources
+        </p>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Events Section */}
         <div>

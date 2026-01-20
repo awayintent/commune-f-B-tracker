@@ -122,8 +122,7 @@ export function BurntEndStories() {
             </h2>
           </div>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Long-form analysis of F&B business failures in Singapore. 
-            Learn from the mistakes of others and understand the real reasons behind closures.
+            Read our latest stories on F&B closures
           </p>
         </div>
 
