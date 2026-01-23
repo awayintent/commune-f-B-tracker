@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useEffect, useState, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { Icon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { Closure } from '@/app/data/types';
@@ -25,10 +25,27 @@ const customIcon = new Icon({
   shadowSize: [41, 41]
 });
 
+// Component to handle map centering when marker is clicked
+function MapController({ center }: { center: Coordinates | null }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (center) {
+      map.setView([center.lat, center.lng], 15, {
+        animate: true,
+        duration: 0.5
+      });
+    }
+  }, [center, map]);
+  
+  return null;
+}
+
 export function MapView({ closures }: MapViewProps) {
   const [closuresWithCoords, setClosuresWithCoords] = useState<ClosureWithCoords[]>([]);
   const [loading, setLoading] = useState(true);
   const [geocodingProgress, setGeocodingProgress] = useState(0);
+  const [mapCenter, setMapCenter] = useState<Coordinates | null>(null);
 
   useEffect(() => {
     async function geocodeClosures() {
@@ -111,11 +128,18 @@ export function MapView({ closures }: MapViewProps) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
+        <MapController center={mapCenter} />
+        
         {closuresWithCoords.map((closure) => (
           <Marker
             key={closure.closure_id}
             position={[closure.coordinates.lat, closure.coordinates.lng]}
             icon={customIcon}
+            eventHandlers={{
+              click: () => {
+                setMapCenter(closure.coordinates);
+              }
+            }}
           >
             <Popup>
               <div className="min-w-[200px] max-w-[300px]">
