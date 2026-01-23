@@ -52,7 +52,7 @@ function parseCSV(csvText: string): Closure[] {
     const fields = parseCSVLine(line);
     
     // Debug logging
-    console.log(`Row: ${fields[2]}, Fields: ${fields.length}, Published field: "${fields[10]}"`);
+    console.log(`Row: ${fields[2]}, Fields: ${fields.length}, Published field: "${fields[12]}"`);
     
     // Need at least business name to be valid
     if (fields.length < 3 || !fields[2]) {
@@ -60,7 +60,7 @@ function parseCSV(csvText: string): Closure[] {
       continue; // Skip incomplete rows
     }
 
-    const publishedValue = fields[10]?.trim();
+    const publishedValue = fields[12]?.trim();
     const isPublished = publishedValue === 'TRUE' || publishedValue === 'true';
     
     console.log(`Business: ${fields[2]}, Published value: "${publishedValue}", Is published: ${isPublished}`);
@@ -71,11 +71,13 @@ function parseCSV(csvText: string): Closure[] {
       business_name: fields[2] || '',
       outlet_name: fields[3] || '',
       address: fields[4] || '',
-      category: fields[5] || '',
-      last_day: fields[6] || '',
-      description: fields[7] || '',
-      source_urls: fields[8] || '',
-      tags: fields[9] || '',
+      postal_code: fields[5] || '',
+      category: fields[6] || '',
+      last_day: fields[7] || '',
+      description: fields[8] || '',
+      source_urls: fields[9] || '',
+      tags: fields[10] || '',
+      image_url: fields[11] || '',
       published: isPublished,
     };
 

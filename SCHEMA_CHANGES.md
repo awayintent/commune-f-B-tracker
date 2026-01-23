@@ -1,5 +1,85 @@
 # Schema Changes Log
 
+## Change #7: Added `postal_code` and `image_url` Columns, Moved `published`
+
+**Date:** January 23, 2026  
+**Reason:** Added postal_code for better location data, image_url for visual content in recent closures cards, and moved published column to the end for better organization.
+
+### What Changed
+
+#### Closures Sheet (Public)
+**Before (11 columns):**
+```
+closure_id | added_at | business_name | outlet_name | address | category | last_day | description | source_urls | tags | published
+```
+
+**After (13 columns):**
+```
+closure_id | added_at | business_name | outlet_name | address | postal_code | category | last_day | description | source_urls | tags | image_url | published
+```
+
+**Changes:**
+- ✅ Added: `postal_code` (column 6) - Singapore postal code for precise location
+- ✅ Added: `image_url` (column 12) - URL to image (e.g., Google Drive link) for visual display
+- 🔄 Moved: `published` from column 11 → column 13 (now at the end)
+- 📝 Note: All columns after `address` shifted right by 1
+
+### Files Updated
+
+1. **google-apps-script/Code.gs**
+   - Updated `CLOSURES_COLUMNS` mapping to include postal_code (5) and image_url (11)
+   - Updated `published` index from 10 → 12
+   - Updated `acceptSubmission()` to include empty postal_code and image_url fields
+   - Updated `promoteCandidatesToClosures()` to include empty postal_code and image_url fields
+
+2. **src/app/data/types.ts**
+   - Added `postal_code: string` to Closure interface
+   - Added `image_url: string` to Closure interface
+
+3. **src/app/data/closures.ts**
+   - Updated CSV parsing to expect 13 columns instead of 11
+   - Updated field mapping for all columns after address
+   - Updated `published` field index from 10 → 12
+
+4. **src/app/components/RecentClosures.tsx**
+   - Updated to use `image_url` from closure data for card backgrounds
+   - Falls back to placeholder image if `image_url` is empty
+
+### Migration Guide
+
+If you already have data in your sheets:
+
+**For Closures sheet:**
+1. Insert a new column after `address` (column F) and name it `postal_code`
+2. Insert a new column after `tags` (column L) and name it `image_url`
+3. Your `published` column should now be in column M
+4. Verify you now have 13 columns total
+5. Optionally fill in postal codes and image URLs for existing entries
+
+**Google Apps Script:**
+- Copy the updated `Code.gs` from `google-apps-script/Code.gs`
+- Replace your existing script completely
+
+**Railway Environment Variables:**
+- No changes needed - CSV URL remains the same
+
+### Benefits
+
+✅ **Better location data** - Postal codes enable precise mapping  
+✅ **Visual appeal** - Images make recent closures cards more engaging  
+✅ **Flexible** - Both fields are optional (empty strings if not available)  
+✅ **Better organization** - Published flag at the end is cleaner
+
+### Image URL Guidelines
+
+For the `image_url` field:
+- Use Google Drive links (make sure they're publicly accessible)
+- Use direct image URLs (must be CORS-friendly)
+- Format: `https://drive.google.com/uc?id=FILE_ID` for Google Drive
+- Leave empty if no image available (will use placeholder)
+
+---
+
 ## Change #6: Removed `status` Column
 
 **Date:** January 18, 2026  

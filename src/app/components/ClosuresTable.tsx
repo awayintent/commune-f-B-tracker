@@ -10,12 +10,16 @@ import {
 import { Input } from '@/app/components/ui/input';
 import { Button } from '@/app/components/ui/button';
 import { Badge } from '@/app/components/ui/badge';
-import { ExternalLink, Search, ChevronUp, ChevronDown } from 'lucide-react';
+import { ExternalLink, Search, ChevronUp, ChevronDown, Map, TableIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchClosures, formatDate } from '@/app/data/closures';
 import type { Closure } from '@/app/data/types';
+import { MapView } from './MapView';
 
 type SortField = 'business_name' | 'last_day' | 'added_at' | 'category';
 type SortDirection = 'asc' | 'desc';
+type ViewMode = 'table' | 'map';
+
+const ITEMS_PER_PAGE = 20;
 
 export function ClosuresTable() {
   const [closures, setClosures] = useState<Closure[]>([]);
@@ -24,6 +28,8 @@ export function ClosuresTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<SortField>('last_day');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Load data
   useEffect(() => {
@@ -47,6 +53,7 @@ export function ClosuresTable() {
   useEffect(() => {
     if (!searchTerm.trim()) {
       setFilteredClosures(closures);
+      setCurrentPage(1); // Reset to first page
       return;
     }
 
@@ -60,6 +67,7 @@ export function ClosuresTable() {
         closure.description.toLowerCase().includes(term)
     );
     setFilteredClosures(filtered);
+    setCurrentPage(1); // Reset to first page
   }, [searchTerm, closures]);
 
   // Sort closures
@@ -98,6 +106,17 @@ export function ClosuresTable() {
     );
   };
 
+  // Pagination
+  const totalPages = Math.ceil(sortedClosures.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedClosures = sortedClosures.slice(startIndex, endIndex);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   if (loading) {
     return (
       <div className="w-full py-12 text-center">
@@ -110,36 +129,76 @@ export function ClosuresTable() {
   return (
     <div className="w-full space-y-4">
       {/* TODO: Add left/right ad spaces (160px each) when ready for monetization */}
-          {/* Search Bar */}
-          <div className="flex items-center gap-2 max-w-md">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                type="text"
-                placeholder="Search by name, location, category..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            {searchTerm && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSearchTerm('')}
-                className="text-gray-600"
-              >
-                Clear
-              </Button>
-            )}
+      
+      {/* Top Controls: Search + View Toggle */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Search Bar */}
+        <div className="flex items-center gap-2 flex-1 max-w-md">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Input
+              type="text"
+              placeholder="Search by name, location, category..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
           </div>
+          {searchTerm && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearchTerm('')}
+              className="text-gray-600"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
 
-          {/* Results Count */}
-          <div className="text-sm text-gray-600">
-            Showing {sortedClosures.length} of {closures.length} closures
-          </div>
+        {/* View Toggle */}
+        <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('table')}
+            className={viewMode === 'table' ? 'bg-white shadow-sm' : ''}
+          >
+            <TableIcon className="w-4 h-4 mr-2" />
+            Table
+          </Button>
+          <Button
+            variant={viewMode === 'map' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('map')}
+            className={viewMode === 'map' ? 'bg-white shadow-sm' : ''}
+          >
+            <Map className="w-4 h-4 mr-2" />
+            Map
+          </Button>
+        </div>
+      </div>
 
-          {/* Table - no horizontal scroll needed */}
+      {/* Results Count */}
+      <div className="text-sm text-gray-600">
+        {viewMode === 'table' ? (
+          <>
+            Showing {startIndex + 1}-{Math.min(endIndex, sortedClosures.length)} of {sortedClosures.length} closures
+            {sortedClosures.length !== closures.length && ` (filtered from ${closures.length})`}
+          </>
+        ) : (
+          <>Showing {sortedClosures.length} closures on map</>
+        )}
+      </div>
+
+      {/* Map View */}
+      {viewMode === 'map' && (
+        <MapView closures={sortedClosures} />
+      )}
+
+      {/* Table View */}
+      {viewMode === 'table' && (
+        <>
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -177,14 +236,14 @@ export function ClosuresTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedClosures.length === 0 ? (
+                {paginatedClosures.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       {searchTerm ? 'No closures found matching your search.' : 'No closures recorded yet.'}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sortedClosures.map((closure) => (
+                  paginatedClosures.map((closure) => (
                     <TableRow key={closure.closure_id} className="hover:bg-gray-50">
                       <TableCell className="font-medium">
                         <div className="line-clamp-2">
@@ -230,6 +289,66 @@ export function ClosuresTable() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Previous
+                </Button>
+                
+                {/* Page numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

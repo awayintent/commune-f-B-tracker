@@ -52,12 +52,14 @@ const CLOSURES_COLUMNS = {
   business_name: 2,
   outlet_name: 3,
   address: 4,
-  category: 5,
-  last_day: 6,
-  description: 7,
-  source_urls: 8,
-  tags: 9,
-  published: 10  // TRUE/FALSE - controls public visibility
+  postal_code: 5,
+  category: 6,
+  last_day: 7,
+  description: 8,
+  source_urls: 9,
+  tags: 10,
+  image_url: 11,
+  published: 12  // TRUE/FALSE - controls public visibility
 };
 
 // Review columns (added to the right of form columns in Submissions sheet)
@@ -362,11 +364,13 @@ function acceptSubmission(row) {
     businessName,                                     // business_name
     data[FORM_COLUMNS['Outlet/Branch Name']],       // outlet_name
     address,                                          // address
+    '',                                               // postal_code - to be filled manually
     '',                                               // category - to be filled manually
     lastDay,                                          // last_day
     data[FORM_COLUMNS['Reason for Closure']],       // description
     data[FORM_COLUMNS['Source URL']],               // source_urls
     '',                                               // tags - to be filled manually
+    '',                                               // image_url - to be filled manually
     canPublish                                        // published - TRUE if all required fields present
   ];
   
@@ -1263,11 +1267,13 @@ function promoteCandidatesToClosures() {
         businessName,                                 // business_name
         '',                                           // outlet_name - empty for candidates
         areaGuess || '',                              // address - use area guess
+        '',                                           // postal_code - to be filled manually
         '',                                           // category - to be filled manually
         publishedAt || '',                            // last_day - use article published date
         `Closure reported by ${publisher}. ${aiReason}`, // description
         url,                                          // source_urls
         '',                                           // tags - to be filled manually
+        '',                                           // image_url - to be filled manually
         canPublish                                    // published - auto-publish if name + area present
       ];
       

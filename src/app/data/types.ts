@@ -6,11 +6,13 @@ export interface Closure {
   business_name: string;
   outlet_name: string;
   address: string;
+  postal_code: string;
   category: string;
   last_day: string;
   description: string;
   source_urls: string;
   tags: string;
+  image_url: string;
   published: boolean;
 }
 
