@@ -3,9 +3,7 @@ nixPkgs = ["nodejs_20"]
 
 [phases.build]
 cmds = [
-  "rm -rf node_modules package-lock.json",
-  "npm install --legacy-peer-deps",
-  "npm install @rollup/rollup-linux-x64-gnu --no-save",
+  "npm install --legacy-peer-deps --include=optional",
   "npm run build"
 ]
 
