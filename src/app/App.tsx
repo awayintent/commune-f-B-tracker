@@ -1,8 +1,7 @@
 import { Header } from '@/app/components/Header';
 import { Footer } from '@/app/components/Footer';
 import { HeadlineCounter } from '@/app/components/HeadlineCounter';
-import { RecentClosures } from '@/app/components/RecentClosures';
-import { RecentOpenings } from '@/app/components/RecentOpenings';
+import { RecentBusinesses } from '@/app/components/RecentBusinesses';
 import { BurntEndStories } from '@/app/components/BurntEndStories';
 import { MainTable } from '@/app/components/MainTable';
 import { SubmissionCTA } from '@/app/components/SubmissionCTA';
@@ -22,17 +21,12 @@ export default function App() {
               <HeadlineCounter />
             </div>
 
-            {/* Recent Closures */}
+            {/* Recent Businesses (Closures/Openings Toggle) */}
             <div className="px-4 md:px-0">
-              <RecentClosures />
+              <RecentBusinesses />
             </div>
 
-            {/* Recent Openings */}
-            <div className="px-4 md:px-0">
-              <RecentOpenings />
-            </div>
-
-            {/* Main Table */}
+            {/* Main Table (Closures/Openings Toggle) */}
             <div className="px-4 md:px-0">
               <MainTable />
             </div>

@@ -16,37 +16,51 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
-import { Calendar } from 'lucide-react';
+import { Calendar, TrendingDown, TrendingUp } from 'lucide-react';
 import { fetchClosures, getMonthlyCounts, getAvailableYears } from '@/app/data/closures';
+import { fetchOpenings, getMonthlyOpeningCounts, getAvailableYears as getAvailableOpeningYears } from '@/app/data/openings';
 import type { MonthlyCounts } from '@/app/data/types';
+
+type DataType = 'closures' | 'openings';
 
 export function HeadlineCounter() {
   const [open, setOpen] = useState(false);
+  const [dataType, setDataType] = useState<DataType>('closures');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [count, setCount] = useState(0);
-  const [counterData, setCounterData] = useState<MonthlyCounts>({});
+  const [closureData, setClosureData] = useState<MonthlyCounts>({});
+  const [openingData, setOpeningData] = useState<MonthlyCounts>({});
   const [years, setYears] = useState<string[]>(['2024', '2025', '2026']);
   const [loading, setLoading] = useState(true);
 
-  // Load closure data on mount
+  // Load both closures and openings data on mount
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const closures = await fetchClosures();
-        const counts = getMonthlyCounts(closures);
-        const availableYears = getAvailableYears(closures);
+        const [closures, openings] = await Promise.all([
+          fetchClosures(),
+          fetchOpenings()
+        ]);
         
-        setCounterData(counts);
+        const closureCounts = getMonthlyCounts(closures);
+        const openingCounts = getMonthlyOpeningCounts(openings);
+        const closureYears = getAvailableYears(closures);
+        const openingYears = getAvailableOpeningYears(openings);
         
-        if (availableYears.length > 0) {
-          setYears(availableYears);
-          // Set the most recent year as default
-          setSelectedYear(availableYears[0]);
+        // Combine years from both datasets
+        const allYears = Array.from(new Set([...closureYears, ...openingYears])).sort().reverse();
+        
+        setClosureData(closureCounts);
+        setOpeningData(openingCounts);
+        
+        if (allYears.length > 0) {
+          setYears(allYears);
+          setSelectedYear(allYears[0]);
         }
       } catch (error) {
-        console.error('Error loading closure data:', error);
+        console.error('Error loading data:', error);
       } finally {
         setLoading(false);
       }
@@ -81,7 +95,8 @@ export function HeadlineCounter() {
   // Animated counter effect
   useEffect(() => {
     const dataKey = getDataKey();
-    const target = counterData[dataKey] || 0;
+    const currentData = dataType === 'closures' ? closureData : openingData;
+    const target = currentData[dataKey] || 0;
     let current = 0;
     const increment = Math.ceil(target / 30);
     const timer = setInterval(() => {
@@ -95,7 +110,7 @@ export function HeadlineCounter() {
     }, 30);
 
     return () => clearInterval(timer);
-  }, [selectedYear, selectedMonth, counterData]);
+  }, [selectedYear, selectedMonth, dataType, closureData, openingData]);
 
   const getPeriodText = () => {
     if (selectedMonth) {
@@ -116,14 +131,44 @@ export function HeadlineCounter() {
   return (
     <div className="bg-gradient-to-br from-[#0b3860] to-[#072a47] text-white py-16 px-4">
       <div className="max-w-4xl mx-auto text-center">
-        <h2 className="text-5xl md:text-7xl font-bold mb-4 text-[#f5903e]">
+        {/* Toggle Buttons */}
+        <div className="flex justify-center gap-4 mb-8">
+          <button
+            onClick={() => setDataType('closures')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+              dataType === 'closures'
+                ? 'bg-[#f5903e] text-white shadow-lg scale-105'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            <TrendingDown className="w-5 h-5" />
+            Closures
+          </button>
+          <button
+            onClick={() => setDataType('openings')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
+              dataType === 'openings'
+                ? 'bg-green-500 text-white shadow-lg scale-105'
+                : 'bg-white/10 text-white/70 hover:bg-white/20'
+            }`}
+          >
+            <TrendingUp className="w-5 h-5" />
+            Openings
+          </button>
+        </div>
+
+        <h2 className={`text-5xl md:text-7xl font-bold mb-4 ${
+          dataType === 'closures' ? 'text-[#f5903e]' : 'text-green-400'
+        }`}>
           {loading ? '...' : count}
         </h2>
         <p className="text-xl md:text-3xl mb-2">
-          F&B Businesses Closed in{' '}
+          F&B Businesses {dataType === 'closures' ? 'Closed' : 'Opened'} in{' '}
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <button className="underline decoration-2 hover:decoration-4 transition-all cursor-pointer inline items-baseline gap-2 text-[#f5903e] text-xl md:text-3xl">
+              <button className={`underline decoration-2 hover:decoration-4 transition-all cursor-pointer inline items-baseline gap-2 text-xl md:text-3xl ${
+                dataType === 'closures' ? 'text-[#f5903e]' : 'text-green-400'
+              }`}>
                 {getPeriodText()}
                 <Calendar className="w-5 h-5 md:w-6 md:h-6 inline align-text-bottom" />
               </button>
@@ -132,7 +177,7 @@ export function HeadlineCounter() {
               <DialogHeader>
                 <DialogTitle>Select Time Period</DialogTitle>
                 <DialogDescription>
-                  Choose a year and optionally a month to view closure statistics
+                  Choose a year and optionally a month to view {dataType === 'closures' ? 'closure' : 'opening'} statistics
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
@@ -185,7 +230,14 @@ export function HeadlineCounter() {
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleApply} className="w-full bg-[#f5903e] hover:bg-[#e07d2a] text-white">
+                <Button 
+                  onClick={handleApply} 
+                  className={`w-full text-white ${
+                    dataType === 'closures' 
+                      ? 'bg-[#f5903e] hover:bg-[#e07d2a]' 
+                      : 'bg-green-600 hover:bg-green-700'
+                  }`}
+                >
                   Apply
                 </Button>
               </DialogFooter>

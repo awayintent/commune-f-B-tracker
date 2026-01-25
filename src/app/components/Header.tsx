@@ -36,7 +36,7 @@ export function Header() {
               className="hidden sm:flex text-[#0b3860] hover:text-[#f5903e] hover:bg-gray-50"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
-              Submit Closure
+              Submit Info
             </Button>
 
             {/* Subscribe CTA - Primary */}
