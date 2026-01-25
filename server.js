@@ -10,6 +10,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Health check endpoint for Railway
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Custom static file server with explicit MIME types
 app.use((req, res, next) => {
   const filePath = path.join(__dirname, 'dist', req.path);
@@ -56,7 +61,30 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-app.listen(PORT, () => {
+// Error handling
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).send('Internal Server Error');
+});
+
+// Start server and bind to 0.0.0.0 for Railway
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`📁 Serving files from: ${path.join(__dirname, 'dist')}`);
+  console.log(`🌐 Server is ready to accept connections`);
+});
+
+// Handle server errors
+server.on('error', (err) => {
+  console.error('❌ Server error:', err);
+  process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('⚠️ SIGTERM received, shutting down gracefully');
+  server.close(() => {
+    console.log('✅ Server closed');
+    process.exit(0);
+  });
 });
