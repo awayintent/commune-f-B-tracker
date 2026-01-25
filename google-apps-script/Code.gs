@@ -1403,6 +1403,65 @@ function initializeArticlesSheet() {
 }
 
 /**
+ * Initialize Openings sheet with headers
+ */
+function initializeOpeningsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let openingsSheet = ss.getSheetByName('Openings');
+  
+  if (!openingsSheet) {
+    openingsSheet = ss.insertSheet('Openings');
+  }
+  
+  const headers = [
+    'opening_id',
+    'added_at',
+    'business_name',
+    'outlet_name',
+    'address',
+    'postal_code',
+    'category',
+    'opening_date',
+    'description',
+    'source_urls',
+    'tags',
+    'image_url',
+    'published'
+  ];
+  
+  openingsSheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  openingsSheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+  openingsSheet.setFrozenRows(1);
+  
+  // Set column widths for better readability
+  openingsSheet.setColumnWidth(1, 100);  // opening_id
+  openingsSheet.setColumnWidth(2, 120);  // added_at
+  openingsSheet.setColumnWidth(3, 200);  // business_name
+  openingsSheet.setColumnWidth(4, 150);  // outlet_name
+  openingsSheet.setColumnWidth(5, 250);  // address
+  openingsSheet.setColumnWidth(6, 80);   // postal_code
+  openingsSheet.setColumnWidth(7, 120);  // category
+  openingsSheet.setColumnWidth(8, 120);  // opening_date
+  openingsSheet.setColumnWidth(9, 300);  // description
+  openingsSheet.setColumnWidth(10, 200); // source_urls
+  openingsSheet.setColumnWidth(11, 150); // tags
+  openingsSheet.setColumnWidth(12, 200); // image_url
+  openingsSheet.setColumnWidth(13, 80);  // published
+  
+  Logger.log('Openings sheet initialized');
+}
+
+/**
+ * Get next opening ID
+ */
+function getNextOpeningId() {
+  const current = parseInt(getProperty('NEXT_OPENING_ID') || '0');
+  const next = current + 1;
+  setProperty('NEXT_OPENING_ID', next.toString());
+  return 'O' + next.toString().padStart(5, '0');
+}
+
+/**
  * Fetch articles from RSS feeds
  * Run this manually or set up a time-based trigger (daily/weekly)
  */

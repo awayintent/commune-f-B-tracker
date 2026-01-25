@@ -2,6 +2,7 @@ import { Header } from '@/app/components/Header';
 import { Footer } from '@/app/components/Footer';
 import { HeadlineCounter } from '@/app/components/HeadlineCounter';
 import { RecentClosures } from '@/app/components/RecentClosures';
+import { RecentOpenings } from '@/app/components/RecentOpenings';
 import { BurntEndStories } from '@/app/components/BurntEndStories';
 import { MainTable } from '@/app/components/MainTable';
 import { SubmissionCTA } from '@/app/components/SubmissionCTA';
@@ -24,6 +25,11 @@ export default function App() {
             {/* Recent Closures */}
             <div className="px-4 md:px-0">
               <RecentClosures />
+            </div>
+
+            {/* Recent Openings */}
+            <div className="px-4 md:px-0">
+              <RecentOpenings />
             </div>
 
             {/* Main Table */}
