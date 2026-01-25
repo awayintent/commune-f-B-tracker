@@ -17,46 +17,61 @@ app.get('/health', (req, res) => {
 
 // Custom static file server with explicit MIME types
 app.use((req, res, next) => {
-  const filePath = path.join(__dirname, 'dist', req.path);
-  const ext = path.extname(req.path).toLowerCase();
+  // Normalize the request path
+  const requestPath = req.path.startsWith('/') ? req.path : '/' + req.path;
+  const filePath = path.join(__dirname, 'dist', requestPath);
+  const ext = path.extname(requestPath).toLowerCase();
+  
+  console.log(`🔍 Request: ${requestPath} -> ${filePath}`);
   
   // Check if file exists
-  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-    // Set MIME type based on extension
-    let contentType = 'application/octet-stream';
-    
-    if (ext === '.js' || ext === '.mjs') {
-      contentType = 'application/javascript; charset=utf-8';
-    } else if (ext === '.css') {
-      contentType = 'text/css; charset=utf-8';
-    } else if (ext === '.html') {
-      contentType = 'text/html; charset=utf-8';
-    } else if (ext === '.json') {
-      contentType = 'application/json; charset=utf-8';
-    } else if (ext === '.png') {
-      contentType = 'image/png';
-    } else if (ext === '.jpg' || ext === '.jpeg') {
-      contentType = 'image/jpeg';
-    } else if (ext === '.svg') {
-      contentType = 'image/svg+xml';
-    } else if (ext === '.ico') {
-      contentType = 'image/x-icon';
-    } else if (ext === '.woff') {
-      contentType = 'font/woff';
-    } else if (ext === '.woff2') {
-      contentType = 'font/woff2';
+  try {
+    if (fs.existsSync(filePath)) {
+      const stats = fs.statSync(filePath);
+      
+      if (stats.isFile()) {
+        // Set MIME type based on extension
+        let contentType = 'application/octet-stream';
+        
+        if (ext === '.js' || ext === '.mjs') {
+          contentType = 'application/javascript; charset=utf-8';
+        } else if (ext === '.css') {
+          contentType = 'text/css; charset=utf-8';
+        } else if (ext === '.html') {
+          contentType = 'text/html; charset=utf-8';
+        } else if (ext === '.json') {
+          contentType = 'application/json; charset=utf-8';
+        } else if (ext === '.png') {
+          contentType = 'image/png';
+        } else if (ext === '.jpg' || ext === '.jpeg') {
+          contentType = 'image/jpeg';
+        } else if (ext === '.svg') {
+          contentType = 'image/svg+xml';
+        } else if (ext === '.ico') {
+          contentType = 'image/x-icon';
+        } else if (ext === '.woff') {
+          contentType = 'font/woff';
+        } else if (ext === '.woff2') {
+          contentType = 'font/woff2';
+        }
+        
+        res.setHeader('Content-Type', contentType);
+        console.log(`✅ Serving ${requestPath} as ${contentType}`);
+        return res.sendFile(filePath);
+      }
     }
-    
-    res.setHeader('Content-Type', contentType);
-    console.log(`📄 Serving ${req.path} as ${contentType}`);
-    res.sendFile(filePath);
-  } else {
-    next();
+  } catch (err) {
+    console.error(`❌ Error checking file ${filePath}:`, err.message);
   }
+  
+  // File doesn't exist or is a directory, continue to next middleware
+  console.log(`⏭️  File not found, passing to next middleware: ${requestPath}`);
+  next();
 });
 
 // Fallback for SPA - serve index.html for all other routes
 app.get('*', (req, res) => {
+  console.log(`📄 Serving index.html for route: ${req.path}`);
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
