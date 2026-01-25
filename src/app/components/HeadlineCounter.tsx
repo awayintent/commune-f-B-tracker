@@ -131,7 +131,7 @@ export function HeadlineCounter() {
     <div className="bg-gradient-to-br from-[#0b3860] to-[#072a47] text-white py-16 px-4">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className={`text-5xl md:text-7xl font-bold mb-4 ${
-          dataType === 'closures' ? 'text-[#f5903e]' : 'text-green-400'
+          dataType === 'closures' ? 'text-red-400' : 'text-green-400'
         }`}>
           {loading ? '...' : count}
         </h2>
@@ -140,7 +140,7 @@ export function HeadlineCounter() {
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <button className={`underline decoration-2 hover:decoration-4 transition-all cursor-pointer inline items-baseline gap-2 text-xl md:text-3xl ${
-                dataType === 'closures' ? 'text-[#f5903e]' : 'text-green-400'
+                dataType === 'closures' ? 'text-red-400' : 'text-green-400'
               }`}>
                 {getPeriodText()}
                 <Calendar className="w-5 h-5 md:w-6 md:h-6 inline align-text-bottom" />
@@ -207,7 +207,7 @@ export function HeadlineCounter() {
                   onClick={handleApply} 
                   className={`w-full text-white ${
                     dataType === 'closures' 
-                      ? 'bg-[#f5903e] hover:bg-[#e07d2a]' 
+                      ? 'bg-red-600 hover:bg-red-700' 
                       : 'bg-green-600 hover:bg-green-700'
                   }`}
                 >

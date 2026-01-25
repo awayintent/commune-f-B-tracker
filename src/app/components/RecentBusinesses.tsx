@@ -77,13 +77,13 @@ export function RecentBusinesses() {
           {dataType === 'closures'
             ? recentClosures.map((closure) => {
                 const backgroundImage = closure.image_url
-                  ? `linear-gradient(rgba(11, 56, 96, 0.5), rgba(11, 56, 96, 0.5)), url('${closure.image_url}')`
-                  : `linear-gradient(rgba(11, 56, 96, 0.5), rgba(11, 56, 96, 0.5)), url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=200&fit=crop')`;
+                  ? `linear-gradient(rgba(185, 28, 28, 0.5), rgba(185, 28, 28, 0.5)), url('${closure.image_url}')`
+                  : `linear-gradient(rgba(185, 28, 28, 0.5), rgba(185, 28, 28, 0.5)), url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=200&fit=crop')`;
 
                 return (
                   <Card
                     key={closure.closure_id}
-                    className="hover:shadow-lg transition-shadow border-[#0b3860]/20 overflow-hidden"
+                    className="hover:shadow-lg transition-shadow border-red-600/20 overflow-hidden"
                   >
                     <CardHeader
                       className="relative items-center min-h-[120px] flex justify-center bg-cover bg-center"
@@ -97,17 +97,17 @@ export function RecentBusinesses() {
                       <div className="space-y-2">
                         {closure.category && (
                           <p className="text-sm text-gray-600">
-                            <span className="font-semibold text-[#0b3860]">Type:</span> {closure.category}
+                            <span className="font-semibold text-red-700">Type:</span> {closure.category}
                           </p>
                         )}
                         {closure.address && (
                           <p className="text-sm text-gray-600 flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-[#f5903e]" />
+                            <MapPin className="w-4 h-4 text-red-600" />
                             <span className="line-clamp-1">{closure.address}</span>
                           </p>
                         )}
                         <p className="text-sm text-gray-600 flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-[#f5903e]" />
+                          <Clock className="w-4 h-4 text-red-600" />
                           <span>{formatClosureDate(closure.last_day || closure.added_at)}</span>
                         </p>
                       </div>

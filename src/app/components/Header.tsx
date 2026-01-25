@@ -35,7 +35,7 @@ export function Header() {
                 onClick={() => setDataType('closures')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   dataType === 'closures'
-                    ? 'bg-[#0b3860] text-white'
+                    ? 'bg-red-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
@@ -46,7 +46,7 @@ export function Header() {
                 onClick={() => setDataType('openings')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
                   dataType === 'openings'
-                    ? 'bg-green-700 text-white'
+                    ? 'bg-green-600 text-white'
                     : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >

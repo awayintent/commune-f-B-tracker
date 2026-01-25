@@ -120,7 +120,7 @@ export function ClosuresTable() {
   if (loading) {
     return (
       <div className="w-full py-12 text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#f5903e] mx-auto"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-600 mx-auto"></div>
         <p className="mt-4 text-gray-600">Loading closures...</p>
       </div>
     );
@@ -206,7 +206,7 @@ export function ClosuresTable() {
                   <TableHead className="font-semibold w-[20%]">
                     <button
                       onClick={() => handleSort('business_name')}
-                      className="flex items-center hover:text-[#f5903e] transition-colors"
+                      className="flex items-center hover:text-red-600 transition-colors"
                     >
                       Business Name
                       <SortIcon field="business_name" />
@@ -216,7 +216,7 @@ export function ClosuresTable() {
                   <TableHead className="font-semibold w-[12%]">
                     <button
                       onClick={() => handleSort('category')}
-                      className="flex items-center hover:text-[#f5903e] transition-colors"
+                      className="flex items-center hover:text-red-600 transition-colors"
                     >
                       Category
                       <SortIcon field="category" />
@@ -225,7 +225,7 @@ export function ClosuresTable() {
                   <TableHead className="font-semibold w-[12%]">
                     <button
                       onClick={() => handleSort('last_day')}
-                      className="flex items-center hover:text-[#f5903e] transition-colors"
+                      className="flex items-center hover:text-red-600 transition-colors"
                     >
                       Last Day
                       <SortIcon field="last_day" />
@@ -256,7 +256,7 @@ export function ClosuresTable() {
                       </TableCell>
                       <TableCell>
                         {closure.category ? (
-                          <Badge variant="secondary" className="bg-[#0b3860] text-white whitespace-nowrap">
+                          <Badge variant="secondary" className="bg-red-600 text-white whitespace-nowrap">
                             {closure.category}
                           </Badge>
                         ) : (
@@ -275,7 +275,7 @@ export function ClosuresTable() {
                             href={closure.source_urls.split(',')[0].trim()}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-[#f5903e] hover:text-[#e07d2a] transition-colors"
+                            className="inline-flex items-center gap-1 text-red-600 hover:text-red-700 transition-colors"
                           >
                             <ExternalLink className="w-4 h-4" />
                           </a>
