@@ -67,11 +67,22 @@ app.use((err, req, res, next) => {
   res.status(500).send('Internal Server Error');
 });
 
+// Check if dist directory exists
+const distPath = path.join(__dirname, 'dist');
+if (!fs.existsSync(distPath)) {
+  console.error(`❌ ERROR: dist directory not found at ${distPath}`);
+  console.error('Available directories:', fs.readdirSync(__dirname));
+  process.exit(1);
+}
+
+console.log('📦 Contents of dist directory:', fs.readdirSync(distPath));
+
 // Start server and bind to 0.0.0.0 for Railway
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server running on port ${PORT}`);
-  console.log(`📁 Serving files from: ${path.join(__dirname, 'dist')}`);
+  console.log(`📁 Serving files from: ${distPath}`);
   console.log(`🌐 Server is ready to accept connections`);
+  console.log(`🔗 Try accessing: http://0.0.0.0:${PORT}`);
 });
 
 // Handle server errors
@@ -88,3 +99,17 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
+
+// Keep process alive
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Log that we're staying alive
+setInterval(() => {
+  console.log('💓 Server heartbeat - still running');
+}, 30000); // Every 30 seconds
