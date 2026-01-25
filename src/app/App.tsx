@@ -2,7 +2,7 @@ import { Header } from '@/app/components/Header';
 import { Footer } from '@/app/components/Footer';
 import { HeadlineCounter } from '@/app/components/HeadlineCounter';
 import { RecentBusinesses } from '@/app/components/RecentBusinesses';
-import { BurntEndStories } from '@/app/components/BurntEndStories';
+import { LatestStories } from '@/app/components/LatestStories';
 import { MainTable } from '@/app/components/MainTable';
 import { SubmissionCTA } from '@/app/components/SubmissionCTA';
 import { EventsAndArticles } from '@/app/components/EventsAndArticles';
@@ -38,9 +38,9 @@ export default function App() {
               <SubmissionCTA />
             </div>
 
-            {/* Burnt End Stories - Full width section */}
+            {/* Latest Stories - Full width section */}
             <div className="-mx-4">
-              <BurntEndStories />
+              <LatestStories />
             </div>
 
             {/* Events and Articles */}
