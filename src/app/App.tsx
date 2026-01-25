@@ -6,11 +6,13 @@ import { BurntEndStories } from '@/app/components/BurntEndStories';
 import { MainTable } from '@/app/components/MainTable';
 import { SubmissionCTA } from '@/app/components/SubmissionCTA';
 import { EventsAndArticles } from '@/app/components/EventsAndArticles';
+import { DataTypeProvider } from '@/app/context/DataTypeContext';
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      <Header />
+    <DataTypeProvider>
+      <div className="min-h-screen bg-white flex flex-col">
+        <Header />
       
       {/* Main Content - Full Width */}
       <div className="flex-1">
@@ -50,6 +52,7 @@ export default function App() {
       </div>
 
       <Footer />
-    </div>
+      </div>
+    </DataTypeProvider>
   );
 }

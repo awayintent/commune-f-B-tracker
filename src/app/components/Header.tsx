@@ -1,8 +1,11 @@
 import { Button } from '@/app/components/ui/button';
-import { Mail, ExternalLink } from 'lucide-react';
+import { Mail, ExternalLink, TrendingDown, TrendingUp } from 'lucide-react';
 import { config } from '@/app/config/env';
+import { useDataType } from '@/app/context/DataTypeContext';
 
 export function Header() {
+  const { dataType, setDataType } = useDataType();
+  
   const handleSubscribe = () => {
     window.open(config.substackUrl, '_blank');
   };
@@ -25,6 +28,32 @@ export function Header() {
             <span className="hidden md:inline text-sm text-gray-500 border-l pl-3 ml-3">
               by <span className="font-semibold text-[#0b3860]">COMMUNE</span>
             </span>
+            
+            {/* Global Toggle */}
+            <div className="hidden lg:flex items-center gap-2 border-l pl-3 ml-3">
+              <button
+                onClick={() => setDataType('closures')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  dataType === 'closures'
+                    ? 'bg-[#0b3860] text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <TrendingDown className="w-4 h-4" />
+                Closures
+              </button>
+              <button
+                onClick={() => setDataType('openings')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  dataType === 'openings'
+                    ? 'bg-green-700 text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <TrendingUp className="w-4 h-4" />
+                Openings
+              </button>
+            </div>
           </div>
 
           {/* Navigation & CTAs */}

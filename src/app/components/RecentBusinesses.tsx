@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Clock, MapPin, TrendingDown, TrendingUp } from 'lucide-react';
+import { Clock, MapPin, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card';
 import { fetchClosures, getRecentClosures, formatDate as formatClosureDate } from '@/app/data/closures';
 import { fetchOpenings, getRecentOpenings, formatDate as formatOpeningDate } from '@/app/data/openings';
 import type { Closure, Opening } from '@/app/data/types';
-
-type DataType = 'closures' | 'openings';
+import { useDataType } from '@/app/context/DataTypeContext';
 
 export function RecentBusinesses() {
-  const [dataType, setDataType] = useState<DataType>('closures');
+  const { dataType } = useDataType();
   const [recentClosures, setRecentClosures] = useState<Closure[]>([]);
   const [recentOpenings, setRecentOpenings] = useState<Opening[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,30 +40,9 @@ export function RecentBusinesses() {
   if (loading) {
     return (
       <section className="py-12">
-        <div className="flex justify-center gap-4 mb-8">
-          <button
-            onClick={() => setDataType('closures')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-              dataType === 'closures'
-                ? 'bg-[#0b3860] text-white shadow-lg'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <TrendingDown className="w-5 h-5" />
-            Recent Closures
-          </button>
-          <button
-            onClick={() => setDataType('openings')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-              dataType === 'openings'
-                ? 'bg-green-700 text-white shadow-lg'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            <TrendingUp className="w-5 h-5" />
-            Recent Openings
-          </button>
-        </div>
+        <h2 className="text-3xl font-bold mb-8 text-center text-[#0b3860]">
+          Most Recent {dataType === 'closures' ? 'Closures' : 'Openings'}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <Card key={i} className="border-[#0b3860]/20 animate-pulse">
@@ -86,31 +64,9 @@ export function RecentBusinesses() {
 
   return (
     <section className="py-12">
-      {/* Toggle Buttons */}
-      <div className="flex justify-center gap-4 mb-8">
-        <button
-          onClick={() => setDataType('closures')}
-          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-            dataType === 'closures'
-              ? 'bg-[#0b3860] text-white shadow-lg scale-105'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          <TrendingDown className="w-5 h-5" />
-          Recent Closures
-        </button>
-        <button
-          onClick={() => setDataType('openings')}
-          className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-            dataType === 'openings'
-              ? 'bg-green-700 text-white shadow-lg scale-105'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          <TrendingUp className="w-5 h-5" />
-          Recent Openings
-        </button>
-      </div>
+      <h2 className="text-3xl font-bold mb-8 text-center text-[#0b3860]">
+        Most Recent {dataType === 'closures' ? 'Closures' : 'Openings'}
+      </h2>
 
       {!hasData ? (
         <p className="text-center text-gray-600">

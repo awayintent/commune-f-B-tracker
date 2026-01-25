@@ -16,16 +16,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/app/components/ui/select';
-import { Calendar, TrendingDown, TrendingUp } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { fetchClosures, getMonthlyCounts, getAvailableYears } from '@/app/data/closures';
 import { fetchOpenings, getMonthlyOpeningCounts, getAvailableYears as getAvailableOpeningYears } from '@/app/data/openings';
 import type { MonthlyCounts } from '@/app/data/types';
-
-type DataType = 'closures' | 'openings';
+import { useDataType } from '@/app/context/DataTypeContext';
 
 export function HeadlineCounter() {
+  const { dataType } = useDataType();
   const [open, setOpen] = useState(false);
-  const [dataType, setDataType] = useState<DataType>('closures');
   const [selectedYear, setSelectedYear] = useState('2026');
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [count, setCount] = useState(0);
@@ -131,32 +130,6 @@ export function HeadlineCounter() {
   return (
     <div className="bg-gradient-to-br from-[#0b3860] to-[#072a47] text-white py-16 px-4">
       <div className="max-w-4xl mx-auto text-center">
-        {/* Toggle Buttons */}
-        <div className="flex justify-center gap-4 mb-8">
-          <button
-            onClick={() => setDataType('closures')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-              dataType === 'closures'
-                ? 'bg-[#f5903e] text-white shadow-lg scale-105'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
-            }`}
-          >
-            <TrendingDown className="w-5 h-5" />
-            Closures
-          </button>
-          <button
-            onClick={() => setDataType('openings')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all ${
-              dataType === 'openings'
-                ? 'bg-green-500 text-white shadow-lg scale-105'
-                : 'bg-white/10 text-white/70 hover:bg-white/20'
-            }`}
-          >
-            <TrendingUp className="w-5 h-5" />
-            Openings
-          </button>
-        </div>
-
         <h2 className={`text-5xl md:text-7xl font-bold mb-4 ${
           dataType === 'closures' ? 'text-[#f5903e]' : 'text-green-400'
         }`}>
