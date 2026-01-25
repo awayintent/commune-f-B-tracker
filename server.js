@@ -8,16 +8,25 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Serve static files from dist directory with correct MIME types
-app.use(express.static('dist', {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
-      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-    } else if (filePath.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css; charset=utf-8');
-    }
+// Middleware to set correct MIME types for all requests
+app.use((req, res, next) => {
+  const ext = path.extname(req.path).toLowerCase();
+  
+  if (ext === '.js' || ext === '.mjs') {
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  } else if (ext === '.css') {
+    res.setHeader('Content-Type', 'text/css; charset=utf-8');
+  } else if (ext === '.json') {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  } else if (ext === '.html') {
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
   }
-}));
+  
+  next();
+});
+
+// Serve static files from dist directory
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // SPA fallback - serve index.html for all other routes
 app.get('*', (req, res) => {
@@ -25,5 +34,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`📁 Serving files from: ${path.join(__dirname, 'dist')}`);
 });
